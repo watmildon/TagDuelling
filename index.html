@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Duelling - OSM Tag Knowledge Game</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tag Duelling</h1>
+            <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+                <span class="theme-icon"></span>
+            </button>
+        </header>
+
+        <!-- Setup Screen -->
+        <section id="setup-screen" class="screen">
+            <div class="card welcome-card">
+                <p class="tagline">The OpenStreetMap Tag Showdown</p>
+                <p class="intro">Think you know OSM tags? Prove it! Take turns adding tags to build a query. But be careful, if the combination you create doesn't exist on OSM, your opponent can call your bluff.</p>
+
+                <div class="rules">
+                    <h3>How to Play</h3>
+                    <ul>
+                        <li><strong>Add tags</strong> &ndash; On your turn, add a new key (like <code>amenity</code>) or specify a value for an existing key (like <code>amenity=cafe</code>)</li>
+                        <li><strong>Keep it real</strong> &ndash; Try to keep tag combinations sensible.</li>
+                        <li><strong>Challenge!</strong> &ndash; Think the last player made an impossible combo? Call their bluff!</li>
+                        <li><strong>Win</strong> &ndash; If you challenge and no objects exist, you win. If objects exist, they win!</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Players</h2>
+                <div id="player-list"></div>
+                <button id="add-player-btn" class="btn btn-secondary">+ Add Player</button>
+            </div>
+
+            <div class="card">
+                <h2>Region</h2>
+                <select id="region-select">
+                    <option value="">Global (entire OSM database)</option>
+                    <option value="custom">Custom (enter relation ID below)</option>
+                    <optgroup label="Countries">
+                        <option data-name="United Kingdom" data-admin-level="2">United Kingdom</option>
+                        <option data-name="Italia" data-admin-level="2">Italy</option>
+                        <option data-name="Deutschland" data-admin-level="2">Germany</option>
+                        <option data-name="France" data-admin-level="2">France</option>
+                        <option data-name="España" data-admin-level="2">Spain</option>
+                        <option data-name="日本" data-admin-level="2">Japan</option>
+                        <option data-name="Australia" data-admin-level="2">Australia</option>
+                    </optgroup>
+                    <optgroup label="States/Regions">
+                        <option data-name="California" data-admin-level="4">California, USA</option>
+                        <option data-name="Texas" data-admin-level="4">Texas, USA</option>
+                        <option data-name="New York" data-admin-level="4">New York State, USA</option>
+                        <option data-name="Bayern" data-admin-level="4">Bavaria, Germany</option>
+                        <option data-name="Île-de-France" data-admin-level="4">Île-de-France, France</option>
+                    </optgroup>
+                    <optgroup label="Cities">
+                        <option data-name="London" data-admin-level="6">London, UK</option>
+                        <option data-name="Paris" data-admin-level="8">Paris, France</option>
+                        <option data-name="Berlin" data-admin-level="4">Berlin, Germany</option>
+                        <option data-name="New York City" data-admin-level="5">New York City, USA</option>
+                        <option data-name="Los Angeles" data-admin-level="6">Los Angeles, USA</option>
+                        <option data-name="Phoenix" data-admin-level="8">Phoenix, USA</option>
+                        <option data-name="東京都" data-admin-level="4">Tokyo, Japan</option>
+                        <option data-name="Sydney" data-admin-level="6">Sydney, Australia</option>
+                    </optgroup>
+                </select>
+                <div id="custom-region-input" class="custom-region-input hidden">
+                    <label for="relation-id-input">OSM Relation ID:</label>
+                    <input type="text" id="relation-id-input" placeholder="e.g., 5750005">
+                    <small>Find relation IDs on <a href="https://www.openstreetmap.org" target="_blank">openstreetmap.org</a></small>
+                </div>
+            </div>
+
+            <button id="start-game-btn" class="btn btn-primary btn-large">Start Game</button>
+        </section>
+
+        <!-- Game Screen -->
+        <section id="game-screen" class="screen hidden">
+            <div class="game-header">
+                <div id="current-player" class="current-player"></div>
+                <div id="player-indicators" class="player-indicators"></div>
+            </div>
+
+            <div class="card tag-pool-card">
+                <h2>Current Tags</h2>
+                <div id="tag-pool" class="tag-pool">
+                    <p class="empty-state">No tags yet. Add the first tag!</p>
+                </div>
+            </div>
+
+            <div class="game-actions">
+                <button id="submit-btn" class="btn btn-primary">Submit</button>
+                <button id="challenge-btn" class="btn btn-danger">Challenge!</button>
+            </div>
+
+            <button id="back-to-setup-btn" class="btn btn-link">Back to Setup</button>
+        </section>
+
+        <!-- Results Screen -->
+        <section id="results-screen" class="screen hidden">
+            <div class="card results-card">
+                <div id="result-icon" class="result-icon"></div>
+                <h2 id="result-title"></h2>
+                <p id="result-message"></p>
+
+                <div class="result-details">
+                    <p><strong>Objects found:</strong> <span id="result-count"></span></p>
+                    <a id="overpass-link" href="#" target="_blank" class="btn btn-secondary">View on Overpass Turbo</a>
+                </div>
+
+                <div class="final-tags">
+                    <h3>Final Tags</h3>
+                    <div id="final-tag-list"></div>
+                </div>
+
+                <div class="results-actions">
+                    <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+                    <button id="new-game-btn" class="btn btn-secondary">New Game (Setup)</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <p>Querying OpenStreetMap...</p>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
