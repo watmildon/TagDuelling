@@ -115,7 +115,14 @@ header h1 {
     font-weight: 700;
 }
 
-/* Theme Toggle */
+/* Header Icons */
+.header-icons {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Icon Button (Theme Toggle & Social Links) */
 .icon-btn {
     background: none;
     border: none;
@@ -123,10 +130,20 @@ header h1 {
     padding: 0.5rem;
     border-radius: var(--radius-sm);
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
 }
 
 .icon-btn:hover {
     background-color: var(--bg-tertiary);
+}
+
+/* Social Icons */
+.social-icon {
+    width: 1.25rem;
+    height: 1.25rem;
 }
 
 .theme-icon::before {
