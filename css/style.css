@@ -839,6 +839,123 @@ body[data-theme="dark"] .theme-icon::before {
     transform: none;
 }
 
+/* Multiplayer Card */
+.multiplayer-card {
+    border: 2px dashed var(--border-color);
+    background-color: var(--bg-tertiary);
+}
+
+.multiplayer-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.multiplayer-section.hidden {
+    display: none;
+}
+
+.multiplayer-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.multiplayer-buttons .btn {
+    flex: 1;
+}
+
+.multiplayer-step {
+    margin-bottom: 1rem;
+}
+
+.multiplayer-step.hidden {
+    display: none;
+}
+
+.step-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.token-display,
+.token-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.token-display textarea,
+.token-input textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: monospace;
+    font-size: 0.75rem;
+    resize: none;
+    word-break: break-all;
+}
+
+.token-display textarea:focus,
+.token-input textarea:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    align-self: flex-start;
+}
+
+.token-loading {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.loading-spinner-small {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.waiting-text {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+    margin-top: 0.5rem;
+}
+
+.connected-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-success);
+}
+
+.connected-indicator {
+    width: 12px;
+    height: 12px;
+    background-color: var(--accent-success);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 /* Responsive */
 @media (max-width: 480px) {
     .container {

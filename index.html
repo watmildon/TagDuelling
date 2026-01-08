@@ -90,7 +90,79 @@
                 </div>
             </div>
 
-            <button id="start-game-btn" class="btn btn-primary btn-large">Start Game</button>
+            <button id="start-game-btn" class="btn btn-primary btn-large">Start Local Game</button>
+
+            <div class="card multiplayer-card">
+                <h2>Online Multiplayer</h2>
+                <p class="multiplayer-intro">Play with a friend over the internet. No account needed - just share a token!</p>
+
+                <div id="multiplayer-default" class="multiplayer-section">
+                    <div class="multiplayer-buttons">
+                        <button id="host-game-btn" class="btn btn-secondary">Host Game</button>
+                        <button id="join-game-btn" class="btn btn-secondary">Join Game</button>
+                    </div>
+                </div>
+
+                <!-- Host Flow -->
+                <div id="multiplayer-host" class="multiplayer-section hidden">
+                    <div id="host-step-1" class="multiplayer-step">
+                        <p class="step-label">Step 1: Generating your invite token...</p>
+                        <div class="token-loading">
+                            <div class="loading-spinner-small"></div>
+                        </div>
+                    </div>
+                    <div id="host-step-2" class="multiplayer-step hidden">
+                        <p class="step-label">Step 1: Send this token to your opponent</p>
+                        <div class="token-display">
+                            <textarea id="host-offer-token" readonly rows="3"></textarea>
+                            <button id="copy-offer-btn" class="btn btn-secondary btn-small">Copy</button>
+                        </div>
+                    </div>
+                    <div id="host-step-3" class="multiplayer-step hidden">
+                        <p class="step-label">Step 2: Paste their response token</p>
+                        <div class="token-input">
+                            <textarea id="host-answer-input" rows="3" placeholder="Paste response token here..."></textarea>
+                            <button id="host-connect-btn" class="btn btn-primary btn-small">Connect</button>
+                        </div>
+                    </div>
+                    <button id="host-cancel-btn" class="btn btn-link">Cancel</button>
+                </div>
+
+                <!-- Join Flow -->
+                <div id="multiplayer-join" class="multiplayer-section hidden">
+                    <div id="join-step-1" class="multiplayer-step">
+                        <p class="step-label">Step 1: Paste the host's invite token</p>
+                        <div class="token-input">
+                            <textarea id="join-offer-input" rows="3" placeholder="Paste invite token here..."></textarea>
+                            <button id="join-accept-btn" class="btn btn-primary btn-small">Accept</button>
+                        </div>
+                    </div>
+                    <div id="join-step-2" class="multiplayer-step hidden">
+                        <p class="step-label">Step 2: Generating response...</p>
+                        <div class="token-loading">
+                            <div class="loading-spinner-small"></div>
+                        </div>
+                    </div>
+                    <div id="join-step-3" class="multiplayer-step hidden">
+                        <p class="step-label">Step 2: Send this response token back to the host</p>
+                        <div class="token-display">
+                            <textarea id="join-answer-token" readonly rows="3"></textarea>
+                            <button id="copy-answer-btn" class="btn btn-secondary btn-small">Copy</button>
+                        </div>
+                        <p class="waiting-text">Waiting for host to connect...</p>
+                    </div>
+                    <button id="join-cancel-btn" class="btn btn-link">Cancel</button>
+                </div>
+
+                <!-- Connected State -->
+                <div id="multiplayer-connected" class="multiplayer-section hidden">
+                    <div class="connected-status">
+                        <span class="connected-indicator"></span>
+                        <span>Connected to opponent!</span>
+                    </div>
+                    <button id="disconnect-btn" class="btn btn-link">Disconnect</button>
+                </div>
+            </div>
         </section>
 
         <!-- Game Screen -->

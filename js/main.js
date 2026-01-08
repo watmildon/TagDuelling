@@ -7,6 +7,8 @@ import * as state from './gameState.js';
 import * as ui from './ui.js';
 import * as overpass from './overpass.js';
 import * as bot from './bot.js';
+import * as webrtc from './webrtc.js';
+import * as multiplayer from './multiplayer.js';
 
 // Local storage keys
 const STORAGE_KEYS = {
@@ -15,6 +17,9 @@ const STORAGE_KEYS = {
     THEME: 'tag-duelling-theme'
 };
 
+// Multiplayer UI element references
+let mpElements = null;
+
 /**
  * Initialize the application
  */
@@ -22,17 +27,67 @@ function init() {
     // Initialize UI elements
     const elements = ui.initElements();
 
+    // Initialize multiplayer elements
+    initMultiplayerElements();
+
+    // Initialize multiplayer module
+    multiplayer.init();
+
     // Load saved preferences
     loadPreferences(elements);
 
     // Set up event listeners
     bindEvents(elements);
+    bindMultiplayerEvents();
 
     // Subscribe to state changes
     state.subscribe(handleStateChange);
 
+    // Set up multiplayer callbacks
+    multiplayer.onRemoteAction(handleRemoteAction);
+    webrtc.onConnected(handleMultiplayerConnected);
+    webrtc.onDisconnected(handleMultiplayerDisconnected);
+
     // Initial render
     renderFromState();
+}
+
+/**
+ * Initialize multiplayer UI element references
+ */
+function initMultiplayerElements() {
+    mpElements = {
+        // Sections
+        defaultSection: document.getElementById('multiplayer-default'),
+        hostSection: document.getElementById('multiplayer-host'),
+        joinSection: document.getElementById('multiplayer-join'),
+        connectedSection: document.getElementById('multiplayer-connected'),
+
+        // Host flow
+        hostStep1: document.getElementById('host-step-1'),
+        hostStep2: document.getElementById('host-step-2'),
+        hostStep3: document.getElementById('host-step-3'),
+        hostOfferToken: document.getElementById('host-offer-token'),
+        hostAnswerInput: document.getElementById('host-answer-input'),
+        copyOfferBtn: document.getElementById('copy-offer-btn'),
+        hostConnectBtn: document.getElementById('host-connect-btn'),
+        hostCancelBtn: document.getElementById('host-cancel-btn'),
+
+        // Join flow
+        joinStep1: document.getElementById('join-step-1'),
+        joinStep2: document.getElementById('join-step-2'),
+        joinStep3: document.getElementById('join-step-3'),
+        joinOfferInput: document.getElementById('join-offer-input'),
+        joinAnswerToken: document.getElementById('join-answer-token'),
+        joinAcceptBtn: document.getElementById('join-accept-btn'),
+        copyAnswerBtn: document.getElementById('copy-answer-btn'),
+        joinCancelBtn: document.getElementById('join-cancel-btn'),
+
+        // Buttons
+        hostGameBtn: document.getElementById('host-game-btn'),
+        joinGameBtn: document.getElementById('join-game-btn'),
+        disconnectBtn: document.getElementById('disconnect-btn')
+    };
 }
 
 /**
@@ -90,8 +145,219 @@ function bindEvents(elements) {
     });
 
     // Results screen
-    elements.playAgainBtn.addEventListener('click', () => state.playAgain());
-    elements.newGameBtn.addEventListener('click', () => state.resetToSetup());
+    elements.playAgainBtn.addEventListener('click', handlePlayAgain);
+    elements.newGameBtn.addEventListener('click', handleNewGame);
+}
+
+/**
+ * Bind multiplayer event listeners
+ */
+function bindMultiplayerEvents() {
+    // Host flow
+    mpElements.hostGameBtn.addEventListener('click', handleHostGame);
+    mpElements.copyOfferBtn.addEventListener('click', () => copyToClipboard(mpElements.hostOfferToken.value, mpElements.copyOfferBtn));
+    mpElements.hostConnectBtn.addEventListener('click', handleHostConnect);
+    mpElements.hostCancelBtn.addEventListener('click', resetMultiplayerUI);
+
+    // Join flow
+    mpElements.joinGameBtn.addEventListener('click', handleJoinGame);
+    mpElements.joinAcceptBtn.addEventListener('click', handleJoinAccept);
+    mpElements.copyAnswerBtn.addEventListener('click', () => copyToClipboard(mpElements.joinAnswerToken.value, mpElements.copyAnswerBtn));
+    mpElements.joinCancelBtn.addEventListener('click', resetMultiplayerUI);
+
+    // Connected state
+    mpElements.disconnectBtn.addEventListener('click', handleDisconnect);
+}
+
+/**
+ * Handle Play Again button
+ */
+function handlePlayAgain() {
+    if (multiplayer.isMultiplayerMode()) {
+        multiplayer.sendPlayAgain();
+    }
+    state.playAgain();
+}
+
+/**
+ * Handle New Game button
+ */
+function handleNewGame() {
+    if (multiplayer.isMultiplayerMode()) {
+        multiplayer.sendBackToSetup();
+    }
+    state.resetToSetup();
+}
+
+/**
+ * Handle Host Game button - start hosting
+ */
+async function handleHostGame() {
+    showMultiplayerSection('host');
+    showHostStep(1);
+
+    try {
+        const offerToken = await webrtc.createOffer();
+        mpElements.hostOfferToken.value = offerToken;
+        showHostStep(2);
+        showHostStep(3);
+    } catch (error) {
+        console.error('Failed to create offer:', error);
+        ui.showError('Failed to create connection. Please try again.');
+        resetMultiplayerUI();
+    }
+}
+
+/**
+ * Handle Host Connect button - accept answer token
+ */
+async function handleHostConnect() {
+    const answerToken = mpElements.hostAnswerInput.value.trim();
+    if (!answerToken) {
+        ui.showError('Please paste the response token from your opponent.');
+        return;
+    }
+
+    try {
+        await webrtc.acceptAnswer(answerToken);
+        // Connection will be established, onConnected callback will handle UI
+    } catch (error) {
+        console.error('Failed to accept answer:', error);
+        ui.showError('Invalid response token. Please check and try again.');
+    }
+}
+
+/**
+ * Handle Join Game button - show join UI
+ */
+function handleJoinGame() {
+    showMultiplayerSection('join');
+    showJoinStep(1);
+}
+
+/**
+ * Handle Join Accept button - accept offer and generate answer
+ */
+async function handleJoinAccept() {
+    const offerToken = mpElements.joinOfferInput.value.trim();
+    if (!offerToken) {
+        ui.showError('Please paste the invite token from the host.');
+        return;
+    }
+
+    showJoinStep(2);
+
+    try {
+        const answerToken = await webrtc.acceptOffer(offerToken);
+        mpElements.joinAnswerToken.value = answerToken;
+        showJoinStep(3);
+        // Connection will be established when host accepts our answer
+    } catch (error) {
+        console.error('Failed to accept offer:', error);
+        ui.showError('Invalid invite token. Please check and try again.');
+        showJoinStep(1);
+    }
+}
+
+/**
+ * Handle Disconnect button
+ */
+function handleDisconnect() {
+    webrtc.disconnect();
+    multiplayer.reset();
+    resetMultiplayerUI();
+}
+
+/**
+ * Handle multiplayer connection established
+ */
+function handleMultiplayerConnected() {
+    showMultiplayerSection('connected');
+
+    // If we're the host, set up players for multiplayer
+    if (webrtc.getIsHost()) {
+        // Update player names for multiplayer
+        state.updatePlayerName(0, 'Player 1 (Host)');
+        state.updatePlayerName(1, 'Player 2 (Guest)');
+        // Ensure both players are human
+        state.setPlayerAsBot(0, false);
+        state.setPlayerAsBot(1, false);
+    }
+}
+
+/**
+ * Handle multiplayer disconnection
+ */
+function handleMultiplayerDisconnected() {
+    resetMultiplayerUI();
+    ui.showError('Connection lost. Please reconnect to continue playing.');
+}
+
+/**
+ * Handle remote action from multiplayer module
+ */
+function handleRemoteAction(actionType, data) {
+    console.log('Remote action:', actionType, data);
+    // State is already updated by multiplayer module
+    // Just need to re-render
+    renderFromState();
+}
+
+/**
+ * Show specific multiplayer section
+ */
+function showMultiplayerSection(section) {
+    mpElements.defaultSection.classList.toggle('hidden', section !== 'default');
+    mpElements.hostSection.classList.toggle('hidden', section !== 'host');
+    mpElements.joinSection.classList.toggle('hidden', section !== 'join');
+    mpElements.connectedSection.classList.toggle('hidden', section !== 'connected');
+}
+
+/**
+ * Show specific host step
+ */
+function showHostStep(step) {
+    mpElements.hostStep1.classList.toggle('hidden', step !== 1);
+    mpElements.hostStep2.classList.toggle('hidden', step < 2);
+    mpElements.hostStep3.classList.toggle('hidden', step < 3);
+}
+
+/**
+ * Show specific join step
+ */
+function showJoinStep(step) {
+    mpElements.joinStep1.classList.toggle('hidden', step !== 1);
+    mpElements.joinStep2.classList.toggle('hidden', step !== 2);
+    mpElements.joinStep3.classList.toggle('hidden', step !== 3);
+}
+
+/**
+ * Reset multiplayer UI to default state
+ */
+function resetMultiplayerUI() {
+    showMultiplayerSection('default');
+    mpElements.hostOfferToken.value = '';
+    mpElements.hostAnswerInput.value = '';
+    mpElements.joinOfferInput.value = '';
+    mpElements.joinAnswerToken.value = '';
+    webrtc.cleanup();
+}
+
+/**
+ * Copy text to clipboard
+ */
+async function copyToClipboard(text, button) {
+    try {
+        await navigator.clipboard.writeText(text);
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+            button.textContent = originalText;
+        }, 2000);
+    } catch (error) {
+        console.error('Failed to copy:', error);
+        ui.showError('Failed to copy to clipboard.');
+    }
 }
 
 // Track if bot turn is in progress to prevent double execution
@@ -236,6 +502,13 @@ function handleRelationIdInput(e) {
 function handleStartGame() {
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
+
+    // In multiplayer, host sends game start to guest
+    if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
+        const currentState = state.getState();
+        multiplayer.sendGameStart(regionData, currentState.players);
+    }
+
     state.startGame();
 }
 
@@ -243,6 +516,12 @@ function handleStartGame() {
  * Handle submit button - validates and processes the player's turn
  */
 function handleSubmit() {
+    // In multiplayer, only allow submit on local player's turn
+    if (multiplayer.isMultiplayerMode() && !multiplayer.isLocalPlayerTurn()) {
+        ui.showError("It's not your turn!");
+        return;
+    }
+
     const validation = ui.validateSingleEdit();
 
     if (!validation.valid) {
@@ -258,6 +537,10 @@ function handleSubmit() {
             ui.showError('That key already exists. Specify a value for it instead.');
             return;
         }
+        // Send to remote in multiplayer
+        if (multiplayer.isMultiplayerMode()) {
+            multiplayer.sendAddTag(key, value);
+        }
     } else if (validation.type === 'value') {
         // Specifying a value for existing key
         const { tagIndex, value } = validation.data;
@@ -272,6 +555,10 @@ function handleSubmit() {
             ui.showError('Failed to set value');
             return;
         }
+        // Send to remote in multiplayer
+        if (multiplayer.isMultiplayerMode()) {
+            multiplayer.sendSpecifyValue(tag.key, value);
+        }
     }
 
     // Move to next turn
@@ -282,10 +569,21 @@ function handleSubmit() {
  * Handle challenge button
  */
 async function handleChallenge() {
+    // In multiplayer, only allow challenge on local player's turn
+    if (multiplayer.isMultiplayerMode() && !multiplayer.isLocalPlayerTurn()) {
+        ui.showError("It's not your turn!");
+        return;
+    }
+
     const currentState = state.getState();
 
     // Initiate challenge
     state.initiateChallenge();
+
+    // Send challenge to remote in multiplayer
+    if (multiplayer.isMultiplayerMode()) {
+        multiplayer.sendChallenge();
+    }
 
     // Show loading
     ui.showLoading();
@@ -293,6 +591,11 @@ async function handleChallenge() {
     try {
         // Execute query
         const count = await overpass.executeCountQuery(currentState.tags, currentState.region);
+
+        // Send result to remote in multiplayer
+        if (multiplayer.isMultiplayerMode()) {
+            multiplayer.sendChallengeResult(count);
+        }
 
         // Set result
         state.setChallengeResult(count);
