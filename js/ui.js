@@ -357,9 +357,9 @@ export function clearEditableInputs() {
  * Render the results screen
  * @param {Object} result - Challenge result object
  * @param {Array} tags - Final tag list
- * @param {string} turboLink - Link to Overpass Turbo
+ * @param {string} ultraLink - Link to Ultra
  */
-export function renderResults(result, tags, turboLink) {
+export function renderResults(result, tags, ultraLink) {
     // Set icon
     elements.resultIcon.className = 'result-icon';
     // We show from challenger's perspective
@@ -381,7 +381,7 @@ export function renderResults(result, tags, turboLink) {
     }
 
     // Overpass link
-    elements.overpassLink.href = turboLink;
+    elements.overpassLink.href = ultraLink;
 
     // Final tags
     renderFinalTags(tags);

@@ -4,7 +4,7 @@
  */
 
 const OVERPASS_ENDPOINT = 'https://overpass.private.coffee/api/interpreter';
-const OVERPASS_TURBO_URL = 'https://overpass-turbo.eu/';
+const OVERPASS_ULTRA_URL = 'https://overpass-ultra.us';
 
 // Common keys sorted by frequency (most common first)
 // Queries run faster when most common keys are at the end of the filter list
@@ -313,13 +313,14 @@ export async function executeCountQuery(tags, region = null) {
 }
 
 /**
- * Build a URL to view results on Overpass Turbo
+ * Build a URL to view results on Ultra
  * @param {Array} tags - Array of {key, value} objects
  * @param {Object|null} region - Region with name/adminLevel or null for global
- * @returns {string} URL to Overpass Turbo
+ * @returns {string} URL to Ultra with server parameter
  */
-export function buildTurboLink(tags, region = null) {
+export function buildUltraLink(tags, region = null) {
     const query = buildDisplayQuery(tags, region);
     const encodedQuery = encodeURIComponent(query);
-    return `${OVERPASS_TURBO_URL}?Q=${encodedQuery}`;
+    const encodedServer = encodeURIComponent(OVERPASS_ENDPOINT);
+    return `${OVERPASS_ULTRA_URL}#query=${encodedQuery}&server=${encodedServer}`;
 }

@@ -168,8 +168,8 @@ function renderGameScreen(currentState) {
  * Render results screen
  */
 function renderResultsScreen(currentState) {
-    const turboLink = overpass.buildTurboLink(currentState.tags, currentState.region);
-    ui.renderResults(currentState.challengeResult, currentState.tags, turboLink);
+    const ultraLink = overpass.buildUltraLink(currentState.tags, currentState.region);
+    ui.renderResults(currentState.challengeResult, currentState.tags, ultraLink);
 }
 
 /**
