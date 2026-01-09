@@ -62,6 +62,10 @@ function loadPreferences(elements) {
 
     // Update custom region input visibility based on selection
     ui.updateCustomRegionVisibility();
+
+    // Sync loaded region to state
+    const regionData = ui.getSelectedRegion();
+    state.setRegion(regionData);
 }
 
 /**
@@ -143,12 +147,25 @@ function renderFromState() {
  * Render setup screen
  */
 function renderSetupScreen(currentState) {
+    const hasBots = state.hasAnyBot();
+    const hasRegion = state.hasRegionSelected();
+
+    // Update conflict warnings and disabled states
+    ui.updateBotRegionConflictState(hasBots, hasRegion);
+
+    // If bots are present and region was reset, clear localStorage
+    if (hasBots && !hasRegion) {
+        localStorage.setItem(STORAGE_KEYS.REGION, '0');
+        localStorage.removeItem(STORAGE_KEYS.RELATION_ID);
+    }
+
     ui.renderPlayerList(
         currentState.players,
         (index, name) => state.updatePlayerName(index, name),
         (index) => state.removePlayer(index),
         (index, isBot) => state.setPlayerAsBot(index, isBot),
-        (index, difficulty) => state.setBotDifficulty(index, difficulty)
+        (index, difficulty) => state.setBotDifficulty(index, difficulty),
+        hasRegion // Disable bot toggles if region is selected
     );
 }
 

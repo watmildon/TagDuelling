@@ -47,12 +47,18 @@
 
             <div class="card">
                 <h2>Players</h2>
+                <div id="bot-warning" class="warning-message hidden">
+                    Bots do not currently support custom regions. Reset region to Global to enable bots.
+                </div>
                 <div id="player-list"></div>
                 <button id="add-player-btn" class="btn btn-secondary">+ Add Player</button>
             </div>
 
             <div class="card">
                 <h2>Region</h2>
+                <div id="region-warning" class="warning-message hidden">
+                    Bots do not currently support custom regions. Playing with bots requires Global region.
+                </div>
                 <select id="region-select">
                     <option value="">Global (entire OSM database)</option>
                     <option value="custom">Custom (enter relation ID below)</option>

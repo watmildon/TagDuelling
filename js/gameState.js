@@ -311,6 +311,8 @@ export function setPlayerAsBot(index, isBot, difficulty = 'medium') {
         // Update name to indicate bot
         if (isBot) {
             state.players[index].name = getRandomBotName();
+            // Bots don't support custom regions, so reset to global
+            state.region = null;
         } else {
             state.players[index].name = `Player ${index + 1}`;
         }
@@ -338,4 +340,20 @@ export function setBotDifficulty(index, difficulty) {
 export function isCurrentPlayerBot() {
     const current = getCurrentPlayer();
     return current && current.isBot === true;
+}
+
+/**
+ * Check if any player is a bot
+ * @returns {boolean}
+ */
+export function hasAnyBot() {
+    return state.players.some(player => player.isBot === true);
+}
+
+/**
+ * Check if a non-global region is selected
+ * @returns {boolean}
+ */
+export function hasRegionSelected() {
+    return state.region !== null;
 }
