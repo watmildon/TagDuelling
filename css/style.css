@@ -1005,31 +1005,65 @@ body[data-theme="dark"] .theme-icon::before {
     color: var(--text-primary);
 }
 
-.token-display,
-.token-input {
+/* Room code display (for hosting) */
+.room-code-display {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    justify-content: center;
+    margin: 1rem 0;
 }
 
-.token-display textarea,
-.token-input textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--border-color);
+.room-code {
+    font-family: monospace;
+    font-size: 2.5rem;
+    font-weight: bold;
+    letter-spacing: 0.3em;
+    padding: 0.75rem 1.5rem;
+    background-color: var(--bg-secondary);
+    border: 2px solid var(--accent-primary);
+    border-radius: var(--radius-md);
+    color: var(--accent-primary);
+    user-select: all;
+}
+
+/* Room code input (for joining) */
+.room-code-input {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    align-items: center;
+    margin: 1rem 0;
+}
+
+.room-code-input input {
+    font-family: monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    letter-spacing: 0.2em;
+    text-align: center;
+    width: 10rem;
+    padding: 0.5rem;
+    border: 2px solid var(--border-color);
     border-radius: var(--radius-sm);
     background-color: var(--bg-secondary);
     color: var(--text-primary);
-    font-family: monospace;
-    font-size: 0.75rem;
-    resize: none;
-    word-break: break-all;
+    text-transform: uppercase;
 }
 
-.token-display textarea:focus,
-.token-input textarea:focus {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 1px;
+.room-code-input input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.room-code-input input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.join-status {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    min-height: 1.25rem;
 }
 
 .btn-small {
