@@ -47,8 +47,8 @@
 
             <div class="card">
                 <h2>Players</h2>
-                <div id="bot-warning" class="warning-message hidden">
-                    Bots do not currently support custom regions. Reset region to Global to enable bots.
+                <div id="bot-warning" class="info-message hidden">
+                    Bots use global TagInfo data for decisions, so custom regions are not available when playing with bots.
                 </div>
                 <div id="player-list"></div>
                 <button id="add-player-btn" class="btn btn-secondary">+ Add Player</button>
@@ -56,8 +56,8 @@
 
             <div class="card">
                 <h2>Region</h2>
-                <div id="region-warning" class="warning-message hidden">
-                    Bots do not currently support custom regions. Playing with bots requires Global region.
+                <div id="region-warning" class="info-message hidden">
+                    Bots use global TagInfo data for decisions, so region selection is disabled when playing with bots.
                 </div>
                 <select id="region-select">
                     <option value="">Global (entire OSM database)</option>
@@ -115,9 +115,11 @@
                     <div class="room-code-display">
                         <span id="host-room-code" class="room-code">......</span>
                     </div>
-                    <p class="waiting-text">Waiting for opponent to join...</p>
-                    <div class="loading-spinner-small"></div>
-                    <button id="host-cancel-btn" class="btn btn-link">Cancel</button>
+                    <div class="host-status">
+                        <p id="host-status-text" class="waiting-text">Retrieving room code...</p>
+                        <div class="loading-spinner-small"></div>
+                        <button id="host-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
                 </div>
 
                 <!-- Join Flow -->
@@ -128,7 +130,7 @@
                         <button id="join-btn" class="btn btn-primary">Join</button>
                     </div>
                     <p id="join-status" class="join-status"></p>
-                    <button id="join-cancel-btn" class="btn btn-link">Cancel</button>
+                    <button id="join-cancel-btn" class="btn btn-secondary">Cancel</button>
                 </div>
 
                 <!-- Connected State -->
@@ -137,7 +139,7 @@
                         <span class="connected-indicator"></span>
                         <span>Connected to opponent!</span>
                     </div>
-                    <button id="disconnect-btn" class="btn btn-link">Disconnect</button>
+                    <button id="disconnect-btn" class="btn btn-secondary">Disconnect</button>
                 </div>
             </div>
         </section>
@@ -161,14 +163,17 @@
                 <h2>Waiting for Host</h2>
                 <p class="waiting-message">The host is setting up the game. The game will start automatically when they're ready.</p>
 
-                <button id="leave-game-btn" class="btn btn-link">Leave Game</button>
+                <button id="leave-game-btn" class="btn btn-secondary">Leave Game</button>
             </div>
         </section>
 
         <!-- Game Screen -->
         <section id="game-screen" class="screen hidden">
             <div class="game-header">
-                <div id="current-player" class="current-player"></div>
+                <div class="current-player">
+                    <div id="current-player-name"></div>
+                    <div id="turn-hint" class="turn-hint"></div>
+                </div>
                 <div id="player-indicators" class="player-indicators"></div>
             </div>
 
@@ -184,7 +189,7 @@
                 <button id="challenge-btn" class="btn btn-danger">Challenge!</button>
             </div>
 
-            <button id="back-to-setup-btn" class="btn btn-link">Back to Setup</button>
+            <button id="back-to-setup-btn" class="btn btn-secondary">Back to Setup</button>
         </section>
 
         <!-- Results Screen -->

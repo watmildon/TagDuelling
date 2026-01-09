@@ -316,6 +316,7 @@ body[data-theme="dark"] .theme-icon::before {
     width: 100%;
     padding: 1rem;
     font-size: 1.125rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Screens */
@@ -424,6 +425,21 @@ body[data-theme="dark"] .theme-icon::before {
     display: none;
 }
 
+/* Info Message */
+.info-message {
+    background-color: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-primary));
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--accent-primary);
+}
+
+.info-message.hidden {
+    display: none;
+}
+
 /* Region Select */
 #region-select {
     width: 100%;
@@ -504,14 +520,24 @@ body[data-theme="dark"] .theme-icon::before {
 }
 
 .current-player {
-    font-size: 1.5rem;
-    font-weight: 600;
     text-align: center;
     padding: 1rem;
     background-color: var(--bg-secondary);
     border-radius: var(--radius-md);
     border: 2px solid var(--accent-primary);
     margin-bottom: 0.5rem;
+}
+
+#current-player-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.turn-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    min-height: 1.1rem;
 }
 
 .player-indicators {
@@ -910,22 +936,6 @@ body[data-theme="dark"] .theme-icon::before {
     min-width: 42px;
 }
 
-/* Bot Difficulty Selector */
-.bot-difficulty {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-    font-size: 0.85rem;
-    cursor: pointer;
-}
-
-.bot-difficulty:focus {
-    outline: 2px solid var(--accent-primary);
-    outline-offset: 1px;
-}
-
 /* Bot Thinking State */
 .current-player.bot-thinking {
     animation: botThinking 1.2s ease-in-out infinite;
@@ -980,6 +990,11 @@ body[data-theme="dark"] .theme-icon::before {
 
 .multiplayer-section.hidden {
     display: none;
+}
+
+#multiplayer-join #join-cancel-btn {
+    display: block;
+    margin: 0.75rem auto 0;
 }
 
 .multiplayer-buttons {
@@ -1094,6 +1109,14 @@ body[data-theme="dark"] .theme-icon::before {
     margin-top: 0.5rem;
 }
 
+.host-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
 .connected-status {
     display: flex;
     align-items: center;
@@ -1135,7 +1158,7 @@ body[data-theme="dark"] .theme-icon::before {
         flex-direction: column;
     }
 
-    .current-player {
+    #current-player-name {
         font-size: 1.25rem;
     }
 

@@ -30,7 +30,9 @@ export function initElements() {
         startGameBtn: document.getElementById('start-game-btn'),
 
         // Game
-        currentPlayer: document.getElementById('current-player'),
+        currentPlayerContainer: document.querySelector('.current-player'),
+        currentPlayerName: document.getElementById('current-player-name'),
+        turnHint: document.getElementById('turn-hint'),
         playerIndicators: document.getElementById('player-indicators'),
         tagPool: document.getElementById('tag-pool'),
         submitBtn: document.getElementById('submit-btn'),
@@ -81,11 +83,10 @@ export function showScreen(screenName) {
  * @param {Function} onNameChange - Callback for name changes
  * @param {Function} onRemove - Callback for removing player
  * @param {Function} onBotToggle - Callback for bot toggle (optional)
- * @param {Function} onDifficultyChange - Callback for difficulty change (optional)
  * @param {boolean} disableBotToggles - Whether bot toggles should be disabled (region selected)
  * @param {Object} multiplayerOptions - Multiplayer mode options { isMultiplayer, localPlayerIndex }
  */
-export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null, disableBotToggles = false, multiplayerOptions = null) {
+export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, disableBotToggles = false, multiplayerOptions = null) {
     elements.playerList.innerHTML = '';
 
     const isMultiplayer = multiplayerOptions?.isMultiplayer || false;
@@ -166,21 +167,6 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
         });
         playerItem.appendChild(input);
 
-        // Difficulty selector (only for bots, not in multiplayer)
-        if (player.isBot && onDifficultyChange && !isMultiplayer) {
-            const difficultySelect = document.createElement('select');
-            difficultySelect.className = 'bot-difficulty';
-            ['easy', 'medium', 'hard'].forEach(diff => {
-                const option = document.createElement('option');
-                option.value = diff;
-                option.textContent = diff.charAt(0).toUpperCase() + diff.slice(1);
-                option.selected = player.difficulty === diff;
-                difficultySelect.appendChild(option);
-            });
-            difficultySelect.addEventListener('change', (e) => onDifficultyChange(index, e.target.value));
-            playerItem.appendChild(difficultySelect);
-        }
-
         // Only show remove button if more than 2 players and not in multiplayer
         if (players.length > 2 && !isMultiplayer) {
             const removeBtn = document.createElement('button');
@@ -200,17 +186,30 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
  * @param {Object} currentPlayer - Current player object
  * @param {Array} players - All players
  * @param {number} currentIndex - Current player index
+ * @param {Array} tags - Current tags in play
  * @param {boolean} isBotThinking - Whether bot is currently thinking
  */
-export function renderCurrentPlayer(currentPlayer, players, currentIndex, isBotThinking = false) {
+export function renderCurrentPlayer(currentPlayer, players, currentIndex, tags = [], isBotThinking = false) {
     const isBot = currentPlayer.isBot;
 
     if (isBot && isBotThinking) {
-        elements.currentPlayer.textContent = `${currentPlayer.name} is thinking...`;
-        elements.currentPlayer.classList.add('bot-thinking');
+        elements.currentPlayerName.textContent = `${currentPlayer.name} is thinking...`;
+        elements.currentPlayerContainer.classList.add('bot-thinking');
     } else {
-        elements.currentPlayer.textContent = `${currentPlayer.name}'s Turn`;
-        elements.currentPlayer.classList.remove('bot-thinking');
+        elements.currentPlayerName.textContent = `${currentPlayer.name}'s Turn`;
+        elements.currentPlayerContainer.classList.remove('bot-thinking');
+    }
+
+    // Update turn hint based on available actions
+    const hasUnspecifiedValue = tags.some(tag => tag.value === null);
+    if (isBot && isBotThinking) {
+        elements.turnHint.textContent = '';
+    } else if (tags.length === 0) {
+        elements.turnHint.textContent = 'Add a new tag to begin';
+    } else if (hasUnspecifiedValue) {
+        elements.turnHint.textContent = 'Add a tag, specify a value, or challenge';
+    } else {
+        elements.turnHint.textContent = 'Add a tag or challenge';
     }
 
     // Render all player indicators
@@ -267,7 +266,7 @@ export function renderTagPool(tags) {
             const valueInput = document.createElement('input');
             valueInput.type = 'text';
             valueInput.className = 'tag-value-input';
-            valueInput.placeholder = '(any value)';
+            valueInput.placeholder = 'Add a value...';
             valueInput.dataset.tagIndex = index;
             valueInput.dataset.inputType = 'value';
             tagItem.appendChild(valueInput);
@@ -397,16 +396,14 @@ export function clearEditableInputs() {
  * @param {string} ultraLink - Link to Ultra
  */
 export function renderResults(result, tags, ultraLink) {
-    // Set icon
+    // Set icon - always celebratory since we're announcing the winner
     elements.resultIcon.className = 'result-icon';
-    // We show from challenger's perspective
+    elements.resultIcon.classList.add('winner');
+    elements.resultTitle.textContent = `${result.winner} Wins!`;
+
     if (result.challengerWon) {
-        elements.resultIcon.classList.add('winner');
-        elements.resultTitle.textContent = `${result.winner} Wins!`;
         elements.resultMessage.textContent = `The challenge was successful! No objects exist with these tags.`;
     } else {
-        elements.resultIcon.classList.add('loser');
-        elements.resultTitle.textContent = `${result.winner} Wins!`;
         elements.resultMessage.textContent = `The challenge failed! Objects exist with these tags.`;
     }
 
@@ -453,7 +450,7 @@ function renderFinalTags(tags) {
         } else {
             const anySpan = document.createElement('span');
             anySpan.className = 'tag-any';
-            anySpan.textContent = '(any value)';
+            anySpan.textContent = 'Add a value...';
             tagItem.appendChild(anySpan);
         }
 
@@ -595,7 +592,8 @@ export function showBotThinking() {
     elements.challengeBtn.disabled = true;
     const inputs = elements.tagPool.querySelectorAll('input');
     inputs.forEach(input => input.disabled = true);
-    elements.currentPlayer.classList.add('bot-thinking');
+    elements.currentPlayerContainer.classList.add('bot-thinking');
+    elements.turnHint.textContent = '';
 }
 
 /**
@@ -606,7 +604,7 @@ export function hideBotThinking() {
     elements.challengeBtn.disabled = false;
     const inputs = elements.tagPool.querySelectorAll('input');
     inputs.forEach(input => input.disabled = false);
-    elements.currentPlayer.classList.remove('bot-thinking');
+    elements.currentPlayerContainer.classList.remove('bot-thinking');
 }
 
 /**

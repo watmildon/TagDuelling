@@ -65,6 +65,7 @@ function initMultiplayerElements() {
 
         // Host flow
         hostRoomCode: document.getElementById('host-room-code'),
+        hostStatusText: document.getElementById('host-status-text'),
         hostCancelBtn: document.getElementById('host-cancel-btn'),
 
         // Join flow
@@ -167,9 +168,17 @@ function bindMultiplayerEvents() {
         }
     });
 
-    // Auto-uppercase room code input
+    // Auto-uppercase room code input and strip invalid characters
     mpElements.joinCodeInput.addEventListener('input', (e) => {
         e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+
+    // Handle paste to trim whitespace before maxlength truncation
+    mpElements.joinCodeInput.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pastedText = e.clipboardData.getData('text');
+        const cleanedText = pastedText.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        e.target.value = cleanedText.slice(0, 6);
     });
 
     // Connected state
@@ -217,10 +226,12 @@ function handleBackToSetup() {
 async function handleHostGame() {
     showMultiplayerSection('host');
     mpElements.hostRoomCode.textContent = '......';
+    mpElements.hostStatusText.textContent = 'Retrieving room code...';
 
     try {
         const roomCode = await webrtc.createRoom();
         mpElements.hostRoomCode.textContent = roomCode;
+        mpElements.hostStatusText.textContent = 'Waiting for opponent to join...';
 
         // Start polling for guest to join
         webrtc.waitForGuest(() => {
@@ -372,7 +383,9 @@ function handleMultiplayerDisconnected() {
     const elements = ui.getElements();
     elements.startGameBtn.textContent = 'Start Local Game';
     elements.addPlayerBtn.classList.remove('hidden');
-    ui.showError('Connection lost. Please reconnect to continue playing.');
+    // Reset players to default
+    state.resetToSetup();
+    ui.showError('Connection lost. Please start a new game to play again.');
 }
 
 /**
@@ -404,7 +417,8 @@ function resetMultiplayerUI() {
     mpElements.joinStatus.textContent = '';
     mpElements.joinBtn.disabled = false;
     mpElements.hostRoomCode.textContent = '';
-    webrtc.cleanup();
+    mpElements.hostStatusText.textContent = 'Retrieving room code...';
+    webrtc.disconnect();
 }
 
 // Track if bot turn is in progress to prevent double execution
@@ -494,8 +508,12 @@ function renderSetupScreen(currentState) {
             }
         },
         (index) => state.removePlayer(index),
-        (index, isBot) => state.setPlayerAsBot(index, isBot),
-        (index, difficulty) => state.setBotDifficulty(index, difficulty),
+        (index, isBot) => {
+            // Assign random difficulty when toggling to bot
+            const difficulties = ['easy', 'medium', 'hard'];
+            const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+            state.setPlayerAsBot(index, isBot, randomDifficulty);
+        },
         hasRegion || isMultiplayerMode, // Disable bot toggles if region is selected or in multiplayer
         multiplayerOptions
     );
@@ -508,7 +526,8 @@ function renderGameScreen(currentState) {
     ui.renderCurrentPlayer(
         state.getCurrentPlayer(),
         currentState.players,
-        currentState.currentPlayerIndex
+        currentState.currentPlayerIndex,
+        currentState.tags
     );
     ui.renderTagPool(currentState.tags);
 
