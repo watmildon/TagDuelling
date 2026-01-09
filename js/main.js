@@ -592,6 +592,9 @@ function handleStartGame() {
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
 
+    // Clear bot's combination cache for fresh game
+    bot.clearCombinationCache();
+
     // In multiplayer, host sends game start to guest
     if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
         const currentState = state.getState();
@@ -674,12 +677,20 @@ async function handleChallenge() {
         multiplayer.sendChallenge();
     }
 
-    // Show loading
+    // Execute query with retry support
+    await executeChallengeQuery(currentState.tags, currentState.region);
+}
+
+/**
+ * Execute the challenge query with retry support
+ * @param {Array} tags - Tags to query
+ * @param {Object|null} region - Region filter
+ */
+async function executeChallengeQuery(tags, region) {
     ui.showLoading();
 
     try {
-        // Execute query
-        const count = await overpass.executeCountQuery(currentState.tags, currentState.region);
+        const count = await overpass.executeCountQuery(tags, region);
 
         // Send result to remote in multiplayer
         if (multiplayer.isMultiplayerMode()) {
@@ -690,8 +701,25 @@ async function handleChallenge() {
         state.setChallengeResult(count);
     } catch (error) {
         console.error('Overpass query failed:', error);
-        ui.showError(`Query failed: ${error.message}. Please try again.`);
-        // Go back to playing state
+
+        // Check if this is a retryable error
+        const isRetryable = error.name === 'OverpassError' && error.retryable;
+
+        if (isRetryable) {
+            // Ask user if they want to retry
+            const shouldRetry = await ui.showRetryDialog(error.message);
+
+            if (shouldRetry) {
+                // Retry the query
+                await executeChallengeQuery(tags, region);
+                return;
+            }
+        } else {
+            // Non-retryable error, just show message
+            ui.showError(`Query failed: ${error.message}`);
+        }
+
+        // User declined retry or error is not retryable - go back to playing state
         state.playAgain();
     } finally {
         ui.hideLoading();

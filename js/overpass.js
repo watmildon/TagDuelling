@@ -6,6 +6,26 @@
 const OVERPASS_ENDPOINT = 'https://overpass.private.coffee/api/interpreter';
 const OVERPASS_ULTRA_URL = 'https://overpass-ultra.us';
 
+/**
+ * Custom error class for Overpass query failures
+ * Distinguishes between retryable errors (timeouts, server issues) and permanent failures
+ */
+export class OverpassError extends Error {
+    /**
+     * @param {string} message - Human-readable error message
+     * @param {string} type - Error type: 'timeout', 'server_error', 'rate_limit', 'parse_error', 'invalid_response', 'network'
+     * @param {boolean} retryable - Whether the user should be offered a retry option
+     * @param {Object} details - Additional error details for debugging
+     */
+    constructor(message, type, retryable = true, details = {}) {
+        super(message);
+        this.name = 'OverpassError';
+        this.type = type;
+        this.retryable = retryable;
+        this.details = details;
+    }
+}
+
 // Common keys sorted by frequency (most common first)
 // Queries run faster when most common keys are at the end of the filter list
 // Source: https://taginfo.openstreetmap.org/keys
@@ -262,26 +282,73 @@ out skel qt;`;
  * @param {Array} tags - Array of {key, value} objects
  * @param {Object|null} region - Region with name/adminLevel or null for global
  * @returns {Promise<number>} Count of matching objects
+ * @throws {OverpassError} On query failure with details about whether retry is appropriate
  */
 export async function executeCountQuery(tags, region = null) {
     const query = buildCountQuery(tags, region);
 
     console.log('Overpass query:', query);
 
-    const response = await fetch(OVERPASS_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `data=${encodeURIComponent(query)}`
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Overpass API error response:', errorText);
-        throw new Error(`Overpass API error: ${response.status} ${response.statusText}\n${errorText}`);
+    let response;
+    try {
+        response = await fetch(OVERPASS_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `data=${encodeURIComponent(query)}`
+        });
+    } catch (networkError) {
+        console.error('Network error:', networkError);
+        throw new OverpassError(
+            'Network error: Unable to reach the Overpass server. Please check your internet connection.',
+            'network',
+            true,
+            { originalError: networkError.message }
+        );
     }
 
+    // Handle HTTP errors
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.error('Overpass API error response:', response.status, errorText);
+
+        // Categorize HTTP errors
+        if (response.status === 429) {
+            throw new OverpassError(
+                'Rate limited: Too many requests to the Overpass server. Please wait a moment and try again.',
+                'rate_limit',
+                true,
+                { status: response.status, body: errorText }
+            );
+        }
+
+        if (response.status === 504 || response.status === 408) {
+            // Gateway timeout or request timeout - likely means too many results
+            // This is actually a "success" case for the game - many results exist
+            console.log('HTTP timeout detected, assuming many results exist');
+            return Infinity;
+        }
+
+        if (response.status >= 500) {
+            throw new OverpassError(
+                'Server error: The Overpass server is experiencing issues. Please try again shortly.',
+                'server_error',
+                true,
+                { status: response.status, body: errorText }
+            );
+        }
+
+        // 4xx errors (except 429 handled above) are usually query problems
+        throw new OverpassError(
+            `Query error: The server rejected the query (HTTP ${response.status}).`,
+            'invalid_response',
+            true,
+            { status: response.status, body: errorText }
+        );
+    }
+
+    // Parse response
     const responseText = await response.text();
     console.log('Overpass response:', responseText);
 
@@ -290,25 +357,93 @@ export async function executeCountQuery(tags, region = null) {
         data = JSON.parse(responseText);
     } catch (parseError) {
         console.error('Failed to parse Overpass response:', responseText);
-        throw new Error(`Failed to parse Overpass response: ${parseError.message}\n${responseText}`);
+
+        // If we got HTML back, the server might be returning an error page
+        if (responseText.trim().startsWith('<')) {
+            // Check for common timeout indicators in HTML error pages
+            if (responseText.toLowerCase().includes('timeout') ||
+                responseText.toLowerCase().includes('timed out')) {
+                console.log('HTML timeout response detected, assuming many results exist');
+                return Infinity;
+            }
+            throw new OverpassError(
+                'Server returned an error page instead of data. The server may be overloaded.',
+                'server_error',
+                true,
+                { responsePreview: responseText.substring(0, 500) }
+            );
+        }
+
+        throw new OverpassError(
+            'Failed to parse server response. The response was not valid JSON.',
+            'parse_error',
+            true,
+            { parseError: parseError.message, responsePreview: responseText.substring(0, 500) }
+        );
     }
 
-    // Check for timeout - if query times out, assume many results exist
+    // Validate response shape - should be an object
+    if (typeof data !== 'object' || data === null) {
+        throw new OverpassError(
+            'Invalid response: Expected an object but received something else.',
+            'invalid_response',
+            true,
+            { receivedType: typeof data }
+        );
+    }
+
+    // Check for timeout in JSON response - if query times out, assume many results exist
     // (queries with few/no results return quickly)
-    if (data.remark && data.remark.includes('timeout')) {
-        return Infinity;
-    }
-
-    // Check for other errors in the response
     if (data.remark) {
+        const remarkLower = data.remark.toLowerCase();
+        if (remarkLower.includes('timeout') ||
+            remarkLower.includes('timed out') ||
+            remarkLower.includes('runtime limit')) {
+            console.log('Timeout detected in response remark, assuming many results exist');
+            return Infinity;
+        }
+
+        // Log other remarks for debugging but don't fail
         console.warn('Overpass remark:', data.remark);
     }
 
-    // The count query returns the count in elements[0].tags.total
-    if (data.elements && data.elements.length > 0 && data.elements[0].tags) {
-        return parseInt(data.elements[0].tags.total, 10) || 0;
+    // Validate that we have an elements array
+    if (!Array.isArray(data.elements)) {
+        // Some error responses have a valid JSON structure but no elements
+        // If there's a remark, it might indicate an issue
+        if (data.remark) {
+            throw new OverpassError(
+                `Query issue: ${data.remark}`,
+                'invalid_response',
+                true,
+                { remark: data.remark }
+            );
+        }
+
+        throw new OverpassError(
+            'Invalid response: Missing elements array in response.',
+            'invalid_response',
+            true,
+            { keys: Object.keys(data) }
+        );
     }
 
+    // The count query returns the count in elements[0].tags.total
+    if (data.elements.length > 0 && data.elements[0].tags && data.elements[0].tags.total !== undefined) {
+        const count = parseInt(data.elements[0].tags.total, 10);
+        if (isNaN(count)) {
+            throw new OverpassError(
+                'Invalid response: Count value is not a number.',
+                'invalid_response',
+                true,
+                { totalValue: data.elements[0].tags.total }
+            );
+        }
+        return count;
+    }
+
+    // Empty elements array with no errors means 0 results
+    // This is a valid response
     return 0;
 }
 
