@@ -282,12 +282,14 @@ body[data-theme="dark"] .theme-icon::before {
 }
 
 .btn-secondary {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-secondary);
     color: var(--text-primary);
+    border: 1px solid var(--border-color);
 }
 
 .btn-secondary:hover {
-    background-color: var(--border-color);
+    background-color: var(--bg-tertiary);
+    border-color: var(--text-secondary);
 }
 
 .btn-danger {
@@ -374,6 +376,37 @@ body[data-theme="dark"] .theme-icon::before {
 
 .player-item .remove-player-btn:hover {
     color: var(--accent-danger-hover);
+}
+
+/* Multiplayer player type indicators */
+.player-type-indicator {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    min-width: 50px;
+    text-align: center;
+}
+
+.player-type-indicator.you {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.player-type-indicator.remote {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.player-item.remote-player input {
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.player-item.local-player {
+    border-left: 3px solid var(--accent-primary);
 }
 
 /* Warning Message */
@@ -705,6 +738,70 @@ body[data-theme="dark"] .theme-icon::before {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+/* Waiting Screen */
+.waiting-card {
+    text-align: center;
+    padding: 2rem;
+}
+
+.waiting-card h2 {
+    margin-bottom: 0.75rem;
+}
+
+.waiting-card .waiting-message {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.waiting-animation {
+    margin-bottom: 1.5rem;
+}
+
+.waiting-animation .loading-spinner {
+    margin: 0 auto 1rem;
+    border-color: var(--border-color);
+    border-top-color: var(--accent-primary);
+}
+
+.waiting-card .connected-status {
+    margin-bottom: 1.5rem;
+}
+
+/* Guest name input on waiting screen */
+.guest-name-section {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.guest-name-section label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.guest-name-section input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    text-align: center;
+}
+
+.guest-name-section input:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+}
+
+/* Waiting for opponent turn state */
+.current-player.waiting-for-opponent {
+    opacity: 0.7;
+    border-style: dashed;
 }
 
 /* Loading Overlay */

@@ -20,6 +20,7 @@ const MSG_TYPES = {
     // Game setup
     GAME_START: 'game_start',
     GAME_CONFIG: 'game_config',
+    PLAYER_NAME: 'player_name', // Guest sends their name to host
 
     // Game actions
     ADD_TAG: 'add_tag',
@@ -37,8 +38,8 @@ const MSG_TYPES = {
  */
 export function init() {
     webrtc.onMessage(handleRemoteMessage);
-    webrtc.onConnected(handleConnected);
-    webrtc.onDisconnected(handleDisconnected);
+    // Note: onConnected and onDisconnected callbacks are handled by main.js
+    // which calls notifyConnected() and notifyDisconnected() to forward events
 }
 
 /**
@@ -85,11 +86,27 @@ function handleConnected() {
 }
 
 /**
+ * Notify multiplayer module that connection is established
+ * Called by main.js since webrtc only supports one onConnected callback
+ */
+export function notifyConnected() {
+    handleConnected();
+}
+
+/**
  * Handle disconnection
  */
 function handleDisconnected() {
     isMultiplayer = false;
     console.log('Multiplayer: Disconnected');
+}
+
+/**
+ * Notify multiplayer module that connection is lost
+ * Called by main.js since webrtc only supports one onDisconnected callback
+ */
+export function notifyDisconnected() {
+    handleDisconnected();
 }
 
 /**
@@ -131,6 +148,10 @@ function handleRemoteMessage(message) {
             handleRemoteBackToSetup();
             break;
 
+        case MSG_TYPES.PLAYER_NAME:
+            handleRemotePlayerName(message);
+            break;
+
         default:
             console.warn('Multiplayer: Unknown message type:', message.type);
     }
@@ -158,6 +179,20 @@ export function sendGameConfig(region) {
     webrtc.send({
         type: MSG_TYPES.GAME_CONFIG,
         region: region
+    });
+}
+
+/**
+ * Send player name to host (guest only)
+ * @param {string} name - Player's name
+ */
+export function sendPlayerName(name) {
+    if (!webrtc.isConnected()) return;
+
+    webrtc.send({
+        type: MSG_TYPES.PLAYER_NAME,
+        name: name,
+        playerIndex: localPlayerIndex
     });
 }
 
@@ -235,22 +270,20 @@ export function sendBackToSetup() {
 // Remote message handlers
 
 function handleRemoteGameStart(message) {
-    // Set up players from host
-    // For multiplayer, we use 2 human players
-    state.resetToSetup();
-
-    // Update player names
+    // Update player names from host
     if (message.players && message.players.length >= 2) {
         state.updatePlayerName(0, message.players[0].name);
         state.updatePlayerName(1, message.players[1].name);
     }
 
-    // Set region
+    // Set region from host
     if (message.region) {
         state.setRegion(message.region);
+    } else {
+        state.setRegion(null); // Global region
     }
 
-    // Start the game
+    // Start the game (transitions from WAITING to PLAYING for guest)
     state.startGame();
 
     if (onRemoteActionCallback) {
@@ -311,10 +344,23 @@ function handleRemotePlayAgain() {
 }
 
 function handleRemoteBackToSetup() {
-    state.backToSetup();
+    // Guest goes back to waiting state, not setup
+    // (Only host can be on setup screen in multiplayer)
+    state.enterWaitingState();
 
     if (onRemoteActionCallback) {
         onRemoteActionCallback('back_to_setup', {});
+    }
+}
+
+function handleRemotePlayerName(message) {
+    // Update remote player's name
+    if (message.playerIndex >= 0) {
+        state.updatePlayerName(message.playerIndex, message.name);
+    }
+
+    if (onRemoteActionCallback) {
+        onRemoteActionCallback('player_name', message);
     }
 }
 

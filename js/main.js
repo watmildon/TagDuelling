@@ -86,7 +86,11 @@ function initMultiplayerElements() {
         // Buttons
         hostGameBtn: document.getElementById('host-game-btn'),
         joinGameBtn: document.getElementById('join-game-btn'),
-        disconnectBtn: document.getElementById('disconnect-btn')
+        disconnectBtn: document.getElementById('disconnect-btn'),
+        leaveGameBtn: document.getElementById('leave-game-btn'),
+
+        // Guest waiting screen
+        guestNameInput: document.getElementById('guest-name-input')
     };
 }
 
@@ -139,7 +143,7 @@ function bindEvents(elements) {
     // Game screen
     elements.submitBtn.addEventListener('click', handleSubmit);
     elements.challengeBtn.addEventListener('click', handleChallenge);
-    elements.backToSetupBtn.addEventListener('click', () => state.backToSetup());
+    elements.backToSetupBtn.addEventListener('click', handleBackToSetup);
 
     // Enter key in tag inputs submits the turn
     elements.tagPool.addEventListener('keypress', (e) => {
@@ -171,6 +175,10 @@ function bindMultiplayerEvents() {
 
     // Connected state
     mpElements.disconnectBtn.addEventListener('click', handleDisconnect);
+
+    // Waiting screen
+    mpElements.leaveGameBtn.addEventListener('click', handleLeaveGame);
+    mpElements.guestNameInput.addEventListener('input', handleGuestNameChange);
 }
 
 /**
@@ -191,6 +199,16 @@ function handleNewGame() {
         multiplayer.sendBackToSetup();
     }
     state.resetToSetup();
+}
+
+/**
+ * Handle Back to Setup button (from game screen)
+ */
+function handleBackToSetup() {
+    if (multiplayer.isMultiplayerMode()) {
+        multiplayer.sendBackToSetup();
+    }
+    state.backToSetup();
 }
 
 /**
@@ -270,22 +288,75 @@ function handleDisconnect() {
     webrtc.disconnect();
     multiplayer.reset();
     resetMultiplayerUI();
+    // Reset UI for local mode
+    const elements = ui.getElements();
+    elements.startGameBtn.textContent = 'Start Local Game';
+    elements.addPlayerBtn.classList.remove('hidden');
+    // Reset to default players
+    state.resetToSetup();
+}
+
+/**
+ * Handle Leave Game button (from waiting screen)
+ */
+function handleLeaveGame() {
+    webrtc.disconnect();
+    multiplayer.reset();
+    state.resetToSetup();
+}
+
+/**
+ * Handle guest name input change
+ */
+function handleGuestNameChange(e) {
+    const name = e.target.value.trim() || 'Guest';
+    // Update local state
+    state.updatePlayerName(multiplayer.getLocalPlayerIndex(), name);
+    // Send to host
+    multiplayer.sendPlayerName(name);
 }
 
 /**
  * Handle multiplayer connection established
  */
 function handleMultiplayerConnected() {
+    // Notify multiplayer module that connection is established
+    // (webrtc only supports one callback, so we need to forward this)
+    multiplayer.notifyConnected();
+
     showMultiplayerSection('connected');
 
-    // If we're the host, set up players for multiplayer
     if (webrtc.getIsHost()) {
-        // Update player names for multiplayer
-        state.updatePlayerName(0, 'Player 1 (Host)');
-        state.updatePlayerName(1, 'Player 2 (Guest)');
-        // Ensure both players are human
+        // Host: set up players for multiplayer, stay on setup screen
+        state.updatePlayerName(0, 'Host');
+        state.updatePlayerName(1, 'Guest (connecting...)');
+        // Ensure both players are human (no bots in multiplayer)
         state.setPlayerAsBot(0, false);
         state.setPlayerAsBot(1, false);
+        // Update start button text
+        updateStartButtonForMultiplayer();
+    } else {
+        // Guest: enter waiting state immediately
+        state.updatePlayerName(0, 'Host');
+        state.updatePlayerName(1, 'Guest');
+        state.setPlayerAsBot(0, false);
+        state.setPlayerAsBot(1, false);
+        // Set default name in input and send to host
+        mpElements.guestNameInput.value = 'Guest';
+        multiplayer.sendPlayerName('Guest');
+        state.enterWaitingState();
+    }
+}
+
+/**
+ * Update start button text for multiplayer mode
+ */
+function updateStartButtonForMultiplayer() {
+    const elements = ui.getElements();
+    if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
+        elements.startGameBtn.textContent = 'Start Remote Game';
+    } else {
+        elements.startGameBtn.textContent = 'Start Local Game';
     }
 }
 
@@ -293,7 +364,14 @@ function handleMultiplayerConnected() {
  * Handle multiplayer disconnection
  */
 function handleMultiplayerDisconnected() {
+    // Notify multiplayer module that connection is lost
+    multiplayer.notifyDisconnected();
+
     resetMultiplayerUI();
+    // Reset UI for local mode
+    const elements = ui.getElements();
+    elements.startGameBtn.textContent = 'Start Local Game';
+    elements.addPlayerBtn.classList.remove('hidden');
     ui.showError('Connection lost. Please reconnect to continue playing.');
 }
 
@@ -392,6 +470,11 @@ function renderFromState() {
             renderSetupScreen(currentState);
             break;
 
+        case state.PHASES.WAITING:
+            // Guest waiting for host to start
+            ui.showScreen('waiting');
+            break;
+
         case state.PHASES.PLAYING:
             ui.showScreen('game');
             renderGameScreen(currentState);
@@ -415,6 +498,7 @@ function renderFromState() {
 function renderSetupScreen(currentState) {
     const hasBots = state.hasAnyBot();
     const hasRegion = state.hasRegionSelected();
+    const isMultiplayerMode = multiplayer.isMultiplayerMode();
 
     // Update conflict warnings and disabled states
     ui.updateBotRegionConflictState(hasBots, hasRegion);
@@ -425,13 +509,30 @@ function renderSetupScreen(currentState) {
         localStorage.removeItem(STORAGE_KEYS.RELATION_ID);
     }
 
+    // Hide add player button in multiplayer mode
+    const elements = ui.getElements();
+    elements.addPlayerBtn.classList.toggle('hidden', isMultiplayerMode);
+
+    // Build multiplayer options if in multiplayer mode
+    const multiplayerOptions = isMultiplayerMode ? {
+        isMultiplayer: true,
+        localPlayerIndex: multiplayer.getLocalPlayerIndex()
+    } : null;
+
     ui.renderPlayerList(
         currentState.players,
-        (index, name) => state.updatePlayerName(index, name),
+        (index, name) => {
+            state.updatePlayerName(index, name);
+            // Send name to remote player if in multiplayer
+            if (isMultiplayerMode && index === multiplayer.getLocalPlayerIndex()) {
+                multiplayer.sendPlayerName(name);
+            }
+        },
         (index) => state.removePlayer(index),
         (index, isBot) => state.setPlayerAsBot(index, isBot),
         (index, difficulty) => state.setBotDifficulty(index, difficulty),
-        hasRegion // Disable bot toggles if region is selected
+        hasRegion || isMultiplayerMode, // Disable bot toggles if region is selected or in multiplayer
+        multiplayerOptions
     );
 }
 
@@ -445,6 +546,12 @@ function renderGameScreen(currentState) {
         currentState.currentPlayerIndex
     );
     ui.renderTagPool(currentState.tags);
+
+    // In multiplayer, disable controls when it's not the local player's turn
+    if (multiplayer.isMultiplayerMode()) {
+        const isLocalTurn = multiplayer.isLocalPlayerTurn();
+        ui.setGameControlsEnabled(isLocalTurn);
+    }
 }
 
 /**

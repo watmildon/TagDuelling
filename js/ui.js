@@ -15,6 +15,7 @@ export function initElements() {
     elements = {
         // Screens
         setupScreen: document.getElementById('setup-screen'),
+        waitingScreen: document.getElementById('waiting-screen'),
         gameScreen: document.getElementById('game-screen'),
         resultsScreen: document.getElementById('results-screen'),
 
@@ -65,10 +66,11 @@ export function getElements() {
 
 /**
  * Show a specific screen, hide others
- * @param {string} screenName - 'setup', 'game', or 'results'
+ * @param {string} screenName - 'setup', 'waiting', 'game', or 'results'
  */
 export function showScreen(screenName) {
     elements.setupScreen.classList.toggle('hidden', screenName !== 'setup');
+    elements.waitingScreen.classList.toggle('hidden', screenName !== 'waiting');
     elements.gameScreen.classList.toggle('hidden', screenName !== 'game');
     elements.resultsScreen.classList.toggle('hidden', screenName !== 'results');
 }
@@ -81,16 +83,29 @@ export function showScreen(screenName) {
  * @param {Function} onBotToggle - Callback for bot toggle (optional)
  * @param {Function} onDifficultyChange - Callback for difficulty change (optional)
  * @param {boolean} disableBotToggles - Whether bot toggles should be disabled (region selected)
+ * @param {Object} multiplayerOptions - Multiplayer mode options { isMultiplayer, localPlayerIndex }
  */
-export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null, disableBotToggles = false) {
+export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null, disableBotToggles = false, multiplayerOptions = null) {
     elements.playerList.innerHTML = '';
+
+    const isMultiplayer = multiplayerOptions?.isMultiplayer || false;
+    const localPlayerIndex = multiplayerOptions?.localPlayerIndex ?? -1;
 
     players.forEach((player, index) => {
         const playerItem = document.createElement('div');
         playerItem.className = 'player-item';
 
-        // Bot toggle (if callbacks provided)
-        if (onBotToggle) {
+        // In multiplayer, mark remote players
+        const isRemotePlayer = isMultiplayer && index !== localPlayerIndex;
+        if (isRemotePlayer) {
+            playerItem.classList.add('remote-player');
+        }
+        if (isMultiplayer && index === localPlayerIndex) {
+            playerItem.classList.add('local-player');
+        }
+
+        // Bot toggle (if callbacks provided and not in multiplayer mode)
+        if (onBotToggle && !isMultiplayer) {
             const toggleContainer = document.createElement('div');
             toggleContainer.className = 'bot-toggle-container';
 
@@ -121,12 +136,27 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
             playerItem.appendChild(toggleContainer);
         }
 
+        // In multiplayer, show player type indicator instead of bot toggle
+        if (isMultiplayer) {
+            const playerTypeIndicator = document.createElement('span');
+            playerTypeIndicator.className = 'player-type-indicator';
+            if (index === localPlayerIndex) {
+                playerTypeIndicator.textContent = 'YOU';
+                playerTypeIndicator.classList.add('you');
+            } else {
+                playerTypeIndicator.textContent = 'REMOTE';
+                playerTypeIndicator.classList.add('remote');
+            }
+            playerItem.appendChild(playerTypeIndicator);
+        }
+
         // Name input
         const input = document.createElement('input');
         input.type = 'text';
         input.value = player.name;
         input.placeholder = `Player ${index + 1}`;
-        input.disabled = player.isBot; // Disable name editing for bots
+        // Disable name editing for bots and remote players
+        input.disabled = player.isBot || isRemotePlayer;
         input.addEventListener('change', (e) => onNameChange(index, e.target.value));
         input.addEventListener('blur', (e) => {
             if (!e.target.value.trim()) {
@@ -136,8 +166,8 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
         });
         playerItem.appendChild(input);
 
-        // Difficulty selector (only for bots)
-        if (player.isBot && onDifficultyChange) {
+        // Difficulty selector (only for bots, not in multiplayer)
+        if (player.isBot && onDifficultyChange && !isMultiplayer) {
             const difficultySelect = document.createElement('select');
             difficultySelect.className = 'bot-difficulty';
             ['easy', 'medium', 'hard'].forEach(diff => {
@@ -151,8 +181,8 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
             playerItem.appendChild(difficultySelect);
         }
 
-        // Only show remove button if more than 2 players
-        if (players.length > 2) {
+        // Only show remove button if more than 2 players and not in multiplayer
+        if (players.length > 2 && !isMultiplayer) {
             const removeBtn = document.createElement('button');
             removeBtn.className = 'remove-player-btn';
             removeBtn.textContent = '\u00D7'; // × symbol
@@ -566,4 +596,18 @@ export function hideBotThinking() {
     const inputs = elements.tagPool.querySelectorAll('input');
     inputs.forEach(input => input.disabled = false);
     elements.currentPlayer.classList.remove('bot-thinking');
+}
+
+/**
+ * Set game controls enabled/disabled state for multiplayer turn management
+ * @param {boolean} isLocalTurn - Whether it's the local player's turn
+ */
+export function setGameControlsEnabled(isLocalTurn) {
+    elements.submitBtn.disabled = !isLocalTurn;
+    elements.challengeBtn.disabled = !isLocalTurn;
+    const inputs = elements.tagPool.querySelectorAll('input');
+    inputs.forEach(input => input.disabled = !isLocalTurn);
+
+    // Add visual indication when it's not the local player's turn
+    elements.currentPlayer.classList.toggle('waiting-for-opponent', !isLocalTurn);
 }

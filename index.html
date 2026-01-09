@@ -99,7 +99,7 @@
             <button id="start-game-btn" class="btn btn-primary btn-large">Start Local Game</button>
 
             <div class="card multiplayer-card">
-                <h2>Online Multiplayer</h2>
+                <h2>Online Multiplayer (experimental)</h2>
                 <p class="multiplayer-intro">Play with a friend over the internet. No account needed - just share a token!</p>
 
                 <div id="multiplayer-default" class="multiplayer-section">
@@ -168,6 +168,29 @@
                     </div>
                     <button id="disconnect-btn" class="btn btn-link">Disconnect</button>
                 </div>
+            </div>
+        </section>
+
+        <!-- Waiting Screen (for multiplayer guests) -->
+        <section id="waiting-screen" class="screen hidden">
+            <div class="card waiting-card">
+                <div class="connected-status">
+                    <span class="connected-indicator"></span>
+                    <span>Connected to host</span>
+                </div>
+
+                <div class="guest-name-section">
+                    <label for="guest-name-input">Your Name</label>
+                    <input type="text" id="guest-name-input" placeholder="Enter your name" maxlength="20">
+                </div>
+
+                <div class="waiting-animation">
+                    <div class="loading-spinner"></div>
+                </div>
+                <h2>Waiting for Host</h2>
+                <p class="waiting-message">The host is setting up the game. The game will start automatically when they're ready.</p>
+
+                <button id="leave-game-btn" class="btn btn-link">Leave Game</button>
             </div>
         </section>
 
