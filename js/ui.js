@@ -484,6 +484,17 @@ export function showError(message) {
 }
 
 /**
+ * Show a retryable error dialog and return user's choice
+ * @param {string} message - Error message to display
+ * @returns {Promise<boolean>} True if user wants to retry, false otherwise
+ */
+export function showRetryDialog(message) {
+    // Use confirm for now - could be upgraded to a custom modal later
+    const retryPrompt = `${message}\n\nWould you like to try again?`;
+    return Promise.resolve(confirm(retryPrompt));
+}
+
+/**
  * Get the selected region data
  * @returns {Object|null} Region object with name/adminLevel or relationId, or null for global
  */
