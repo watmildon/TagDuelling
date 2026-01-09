@@ -376,6 +376,21 @@ body[data-theme="dark"] .theme-icon::before {
     color: var(--accent-danger-hover);
 }
 
+/* Warning Message */
+.warning-message {
+    background-color: var(--tag-any-bg);
+    color: var(--tag-any-text);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--tag-any-text);
+}
+
+.warning-message.hidden {
+    display: none;
+}
+
 /* Region Select */
 #region-select {
     width: 100%;
@@ -385,6 +400,12 @@ body[data-theme="dark"] .theme-icon::before {
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     font-size: 1rem;
+}
+
+#region-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--bg-tertiary);
 }
 
 /* Custom Region Input */
@@ -773,6 +794,15 @@ body[data-theme="dark"] .theme-icon::before {
 .bot-toggle input:checked + .bot-toggle-slider::before {
     transform: translateX(22px);
     background-color: white;
+}
+
+.bot-toggle.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bot-toggle input:disabled {
+    cursor: not-allowed;
 }
 
 .bot-toggle-text {

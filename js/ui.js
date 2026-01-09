@@ -21,7 +21,9 @@ export function initElements() {
         // Setup
         playerList: document.getElementById('player-list'),
         addPlayerBtn: document.getElementById('add-player-btn'),
+        botWarning: document.getElementById('bot-warning'),
         regionSelect: document.getElementById('region-select'),
+        regionWarning: document.getElementById('region-warning'),
         customRegionInput: document.getElementById('custom-region-input'),
         relationIdInput: document.getElementById('relation-id-input'),
         startGameBtn: document.getElementById('start-game-btn'),
@@ -78,8 +80,9 @@ export function showScreen(screenName) {
  * @param {Function} onRemove - Callback for removing player
  * @param {Function} onBotToggle - Callback for bot toggle (optional)
  * @param {Function} onDifficultyChange - Callback for difficulty change (optional)
+ * @param {boolean} disableBotToggles - Whether bot toggles should be disabled (region selected)
  */
-export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null) {
+export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null, disableBotToggles = false) {
     elements.playerList.innerHTML = '';
 
     players.forEach((player, index) => {
@@ -93,10 +96,14 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
 
             const toggleLabel = document.createElement('label');
             toggleLabel.className = 'bot-toggle';
+            if (disableBotToggles) {
+                toggleLabel.classList.add('disabled');
+            }
 
             const toggleCheckbox = document.createElement('input');
             toggleCheckbox.type = 'checkbox';
             toggleCheckbox.checked = player.isBot || false;
+            toggleCheckbox.disabled = disableBotToggles;
             toggleCheckbox.addEventListener('change', (e) => onBotToggle(index, e.target.checked));
 
             const toggleSlider = document.createElement('span');
@@ -501,6 +508,42 @@ export function setRelationIdInput(relationId) {
     if (elements.relationIdInput) {
         elements.relationIdInput.value = relationId || '';
     }
+}
+
+/**
+ * Update bot/region conflict state
+ * @param {boolean} hasBots - Whether any player is a bot
+ * @param {boolean} hasRegion - Whether a non-global region is selected
+ */
+export function updateBotRegionConflictState(hasBots, hasRegion) {
+    // Region select: disable if bots are present
+    elements.regionSelect.disabled = hasBots;
+    elements.regionWarning.classList.toggle('hidden', !hasBots);
+
+    // Bot warning in players section: show if region is selected
+    elements.botWarning.classList.toggle('hidden', !hasRegion);
+
+    // If bots are present, reset region select to global and hide custom input
+    if (hasBots) {
+        elements.regionSelect.selectedIndex = 0; // Reset to "Global"
+        elements.customRegionInput.classList.add('hidden');
+        elements.relationIdInput.disabled = true;
+        elements.relationIdInput.value = '';
+    } else {
+        elements.relationIdInput.disabled = false;
+        // Custom region visibility handled by updateCustomRegionVisibility
+    }
+}
+
+/**
+ * Check if bot toggles should be disabled (region is selected)
+ * @returns {boolean}
+ */
+export function shouldDisableBotToggles() {
+    const select = elements.regionSelect;
+    const option = select.options[select.selectedIndex];
+    // Disable if any region other than global is selected
+    return option.value !== '' || (option.value === 'custom' && elements.relationIdInput.value.trim() !== '');
 }
 
 /**
