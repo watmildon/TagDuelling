@@ -56,6 +56,10 @@ const KEY_COMBINATIONS = {
 // List of common keys (the top 20)
 const COMMON_KEYS = Object.keys(KEY_COMBINATIONS);
 
+// Cache for combination data - avoids redundant API calls during a game
+// Maps key -> array of combination objects from TagInfo
+const combinationCache = new Map();
+
 // Keys known to have many values (frequency rank)
 const KEY_FREQUENCY_RANK = {
     'building': 1, 'source': 2, 'highway': 3, 'name': 4, 'surface': 5,
@@ -181,25 +185,105 @@ async function pickNextTag(existingTags, config) {
 }
 
 /**
- * Find keys that commonly co-occur with existing tags
+ * Get combinations for a key, using cache if available
+ * @param {string} key - The tag key
+ * @returns {Promise<Array>} Combination data from TagInfo
+ */
+async function getCachedCombinations(key) {
+    if (combinationCache.has(key)) {
+        console.log(`Bot: Using cached combinations for "${key}"`);
+        return combinationCache.get(key);
+    }
+
+    console.log(`Bot: Fetching combinations for "${key}"...`);
+    const combinations = await fetchKeyCombinations(key);
+    combinationCache.set(key, combinations);
+    return combinations;
+}
+
+/**
+ * Clear the combination cache (call when starting a new game)
+ */
+export function clearCombinationCache() {
+    combinationCache.clear();
+    console.log('Bot: Combination cache cleared');
+}
+
+/**
+ * Find keys that commonly co-occur with ALL existing tags
+ * Scores candidates based on how well they combine with multiple tags
  */
 async function findCombinedKeyCandidates(existingTags, config) {
-    // Get combinations for the most recent tag (usually most constraining)
-    const mostRecent = existingTags[existingTags.length - 1];
-    const combinations = await fetchKeyCombinations(mostRecent.key);
-
-    // Filter out keys already in use
     const existingKeys = new Set(existingTags.map(t => t.key));
-    const candidates = combinations.filter(c =>
-        !existingKeys.has(c.other_key) &&
-        c.together_count > 10 && // Must have some real data
-        c.to_fraction > 0.001    // Must co-occur at least 0.1% of the time
-    );
 
-    // For hard difficulty, prefer rarer combinations (more likely to lead to challenge)
-    if (config.preferRareKeys) {
-        // Sort by to_fraction ascending (rarer combinations first)
-        candidates.sort((a, b) => a.to_fraction - b.to_fraction);
+    // Fetch combinations for ALL existing tags (using cache)
+    // This gives us a broader view of what keys work well together
+    const allCombinationPromises = existingTags.map(tag => getCachedCombinations(tag.key));
+    const allCombinationsArrays = await Promise.all(allCombinationPromises);
+
+    // Build a score map: candidate_key -> { totalScore, tagMatches, combinationData }
+    const candidateScores = new Map();
+
+    for (let i = 0; i < existingTags.length; i++) {
+        const sourceTag = existingTags[i];
+        const combinations = allCombinationsArrays[i];
+
+        for (const combo of combinations) {
+            // Skip keys already in use
+            if (existingKeys.has(combo.other_key)) continue;
+
+            // Skip if co-occurrence is too low
+            if (combo.together_count < 10 || combo.to_fraction < 0.001) continue;
+
+            const key = combo.other_key;
+            if (!candidateScores.has(key)) {
+                candidateScores.set(key, {
+                    key,
+                    totalScore: 0,
+                    tagMatches: 0,
+                    minFraction: Infinity,
+                    maxFraction: 0,
+                    sources: []
+                });
+            }
+
+            const candidate = candidateScores.get(key);
+            candidate.tagMatches++;
+            candidate.totalScore += combo.to_fraction;
+            candidate.minFraction = Math.min(candidate.minFraction, combo.to_fraction);
+            candidate.maxFraction = Math.max(candidate.maxFraction, combo.to_fraction);
+            candidate.sources.push({
+                sourceKey: sourceTag.key,
+                toFraction: combo.to_fraction,
+                togetherCount: combo.together_count
+            });
+        }
+    }
+
+    // Convert to array and filter/sort
+    let candidates = Array.from(candidateScores.values());
+
+    // Prefer candidates that match multiple existing tags
+    // This increases likelihood the combination actually exists
+    candidates.sort((a, b) => {
+        // First priority: more tag matches is better
+        if (b.tagMatches !== a.tagMatches) {
+            return b.tagMatches - a.tagMatches;
+        }
+        // Second priority: depends on difficulty
+        if (config.preferRareKeys) {
+            // Hard mode: prefer lower minFraction (rarer combinations)
+            return a.minFraction - b.minFraction;
+        } else {
+            // Easy mode: prefer higher totalScore (more common combinations)
+            return b.totalScore - a.totalScore;
+        }
+    });
+
+    // Log what we found for debugging
+    if (candidates.length > 0) {
+        const top = candidates[0];
+        console.log(`Bot: Found ${candidates.length} candidates. Top: "${top.key}" matches ${top.tagMatches}/${existingTags.length} tags`);
     }
 
     return candidates.slice(0, 20); // Top 20 candidates
@@ -213,12 +297,14 @@ function pickFromCandidates(candidates, config) {
     if (Math.random() < config.randomness) {
         // Random pick from candidates
         const randomCandidate = candidates[Math.floor(Math.random() * candidates.length)];
-        return { key: randomCandidate.other_key, value: null };
+        console.log(`Bot: Randomly picked "${randomCandidate.key}" (matches ${randomCandidate.tagMatches} tags)`);
+        return { key: randomCandidate.key, value: null };
     }
 
     // Strategic pick - prefer top candidate (most or least common depending on sort)
     const topCandidate = candidates[0];
-    return { key: topCandidate.other_key, value: null };
+    console.log(`Bot: Strategically picked "${topCandidate.key}" (matches ${topCandidate.tagMatches} tags, minFraction=${topCandidate.minFraction.toFixed(4)})`);
+    return { key: topCandidate.key, value: null };
 }
 
 /**

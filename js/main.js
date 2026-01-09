@@ -592,6 +592,9 @@ function handleStartGame() {
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
 
+    // Clear bot's combination cache for fresh game
+    bot.clearCombinationCache();
+
     // In multiplayer, host sends game start to guest
     if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
         const currentState = state.getState();
