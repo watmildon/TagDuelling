@@ -618,6 +618,25 @@ body[data-theme="dark"] .theme-icon::before {
     font-style: italic;
 }
 
+/* Wiki link for tags on results screen */
+.tag-wiki-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.15s ease;
+}
+
+.tag-wiki-link:hover {
+    opacity: 0.8;
+}
+
+.tag-wiki-link:hover .tag-key,
+.tag-wiki-link:hover .tag-value {
+    text-decoration: underline;
+}
+
 /* Inline tag editing */
 .tag-value-input {
     flex: 1;

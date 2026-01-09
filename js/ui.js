@@ -422,6 +422,23 @@ export function renderResults(result, tags, ultraLink) {
 }
 
 /**
+ * Build a link to the OSM wiki for a tag
+ * @param {string} key - Tag key
+ * @param {string|null} value - Tag value or null for key-only
+ * @returns {string} URL to the OSM wiki page
+ */
+function buildWikiLink(key, value) {
+    const baseUrl = 'https://wiki.openstreetmap.org/wiki/';
+    if (value !== null) {
+        // Tag:key=value format
+        return `${baseUrl}Tag:${encodeURIComponent(key)}%3D${encodeURIComponent(value)}`;
+    } else {
+        // Key:key format
+        return `${baseUrl}Key:${encodeURIComponent(key)}`;
+    }
+}
+
+/**
  * Render tags in results screen
  * @param {Array} tags - Array of {key, value} objects
  */
@@ -432,28 +449,37 @@ function renderFinalTags(tags) {
         const tagItem = document.createElement('div');
         tagItem.className = 'tag-item';
 
+        // Wrap tag in a link to OSM wiki
+        const wikiLink = document.createElement('a');
+        wikiLink.href = buildWikiLink(tag.key, tag.value);
+        wikiLink.target = '_blank';
+        wikiLink.rel = 'noopener noreferrer';
+        wikiLink.className = 'tag-wiki-link';
+        wikiLink.title = 'View on OSM Wiki';
+
         const keySpan = document.createElement('span');
         keySpan.className = 'tag-key';
         keySpan.textContent = tag.key;
-        tagItem.appendChild(keySpan);
+        wikiLink.appendChild(keySpan);
 
         if (tag.value !== null) {
             const equalsSpan = document.createElement('span');
             equalsSpan.className = 'tag-equals';
             equalsSpan.textContent = ' = ';
-            tagItem.appendChild(equalsSpan);
+            wikiLink.appendChild(equalsSpan);
 
             const valueSpan = document.createElement('span');
             valueSpan.className = 'tag-value';
             valueSpan.textContent = tag.value;
-            tagItem.appendChild(valueSpan);
+            wikiLink.appendChild(valueSpan);
         } else {
             const anySpan = document.createElement('span');
             anySpan.className = 'tag-any';
-            anySpan.textContent = 'Add a value...';
-            tagItem.appendChild(anySpan);
+            anySpan.textContent = ' (any value)';
+            wikiLink.appendChild(anySpan);
         }
 
+        tagItem.appendChild(wikiLink);
         elements.finalTagList.appendChild(tagItem);
     });
 }
