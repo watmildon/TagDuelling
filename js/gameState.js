@@ -3,6 +3,8 @@
  * Manages the game state and provides mutation functions
  */
 
+import { prefetchTagCount } from './overpass.js';
+
 // DWG (Data Working Group) member IRC usernames for bot names
 const DWG_USERNAMES = [
     'edvac', 'trigpoint', 'RicoElectrico', 'supaplextw', 'fizzie41',
@@ -164,10 +166,15 @@ export function addTag(key, value = null) {
         return false; // Key already exists
     }
 
+    const trimmedValue = value ? value.trim() : null;
     state.tags.push({
         key: trimmedKey,
-        value: value ? value.trim() : null
+        value: trimmedValue
     });
+
+    // Prefetch taginfo count in the background for query optimization
+    prefetchTagCount(trimmedKey, trimmedValue);
+
     notifySubscribers();
     return true;
 }
@@ -192,6 +199,10 @@ export function specifyTagValue(key, value) {
     }
 
     tag.value = trimmedValue;
+
+    // Prefetch taginfo count for the new key=value combination
+    prefetchTagCount(trimmedKey, trimmedValue);
+
     notifySubscribers();
     return true;
 }

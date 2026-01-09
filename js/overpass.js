@@ -132,53 +132,204 @@ const KEY_FREQUENCY_RANK = {
     'playground': 100
 };
 
+// Taginfo API for fetching actual tag usage counts
+// Note: These are global OSM counts, used even in regional game modes.
+// Regional tag prevalence would require Overpass queries which are too slow for prefetching.
+const TAGINFO_API = 'https://taginfo.openstreetmap.org/api/4';
+const TAGINFO_CACHE_KEY = 'tag-duelling-taginfo-cache';
+const TAGINFO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+/**
+ * Check if localStorage is available
+ * @returns {boolean}
+ */
+function isLocalStorageAvailable() {
+    try {
+        const test = '__localStorage_test__';
+        localStorage.setItem(test, test);
+        localStorage.removeItem(test);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// In-memory cache for current session (loaded from localStorage on init)
+let taginfoCache = loadTaginfoCache();
+
+/**
+ * Load taginfo cache from localStorage
+ * @returns {Map} Cache map with tag keys and {count, timestamp} values
+ */
+function loadTaginfoCache() {
+    if (!isLocalStorageAvailable()) {
+        return new Map();
+    }
+
+    try {
+        const stored = localStorage.getItem(TAGINFO_CACHE_KEY);
+        if (!stored) return new Map();
+
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        const cache = new Map();
+
+        // Only load entries that haven't expired
+        for (const [key, entry] of Object.entries(parsed)) {
+            if (now - entry.timestamp < TAGINFO_CACHE_TTL) {
+                cache.set(key, entry);
+            }
+        }
+
+        return cache;
+    } catch (error) {
+        console.warn('Failed to load taginfo cache:', error);
+        return new Map();
+    }
+}
+
+/**
+ * Save taginfo cache to localStorage
+ */
+function saveTaginfoCache() {
+    if (!isLocalStorageAvailable()) {
+        return;
+    }
+
+    try {
+        const obj = Object.fromEntries(taginfoCache);
+        localStorage.setItem(TAGINFO_CACHE_KEY, JSON.stringify(obj));
+    } catch (error) {
+        console.warn('Failed to save taginfo cache:', error);
+    }
+}
+
+/**
+ * Get the cache key for a tag
+ * @param {string} key - Tag key
+ * @param {string|null} value - Tag value or null for key-only
+ * @returns {string} Cache key
+ */
+function getTagCacheKey(key, value) {
+    return value !== null ? `${key}=${value}` : key;
+}
+
+/**
+ * Get cached count for a tag if available and not expired
+ * @param {string} key - Tag key
+ * @param {string|null} value - Tag value or null
+ * @returns {number|null} Cached count or null if not cached/expired
+ */
+function getCachedTagCount(key, value) {
+    const cacheKey = getTagCacheKey(key, value);
+    const entry = taginfoCache.get(cacheKey);
+
+    if (!entry) return null;
+
+    // Check if expired
+    if (Date.now() - entry.timestamp >= TAGINFO_CACHE_TTL) {
+        taginfoCache.delete(cacheKey);
+        return null;
+    }
+
+    return entry.count;
+}
+
+/**
+ * Fetch tag count from taginfo API
+ * @param {string} key - Tag key
+ * @param {string|null} value - Tag value or null for key-only
+ * @returns {Promise<number|null>} Count or null on failure
+ */
+async function fetchTagCount(key, value) {
+    const endpoint = value !== null
+        ? `${TAGINFO_API}/tag/stats?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`
+        : `${TAGINFO_API}/key/stats?key=${encodeURIComponent(key)}`;
+
+    try {
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+            console.warn(`Taginfo API error for ${key}=${value}:`, response.status);
+            return null;
+        }
+
+        const data = await response.json();
+        const allStats = data.data?.find(d => d.type === 'all');
+        return allStats ? allStats.count : 0;
+    } catch (error) {
+        console.warn(`Taginfo fetch failed for ${key}=${value}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Prefetch tag count in the background and cache it
+ * Call this when a tag is added to the game
+ * @param {string} key - Tag key
+ * @param {string|null} value - Tag value or null for key-only
+ */
+export async function prefetchTagCount(key, value) {
+    const cacheKey = getTagCacheKey(key, value);
+
+    // Skip if already cached and not expired
+    if (getCachedTagCount(key, value) !== null) {
+        console.log(`Taginfo cache hit for ${cacheKey}`);
+        return;
+    }
+
+    console.log(`Prefetching taginfo for ${cacheKey}...`);
+    const count = await fetchTagCount(key, value);
+
+    if (count !== null) {
+        taginfoCache.set(cacheKey, {
+            count,
+            timestamp: Date.now()
+        });
+        saveTaginfoCache();
+        console.log(`Taginfo cached: ${cacheKey} = ${count}`);
+    }
+}
+
+/**
+ * Get the usage count for sorting purposes
+ * Uses taginfo cache if available, falls back to static KEY_FREQUENCY_RANK
+ * @param {Object} tag - Tag object with key and value
+ * @returns {number} Usage count (lower = less common = should come first)
+ */
+function getTagSortCount(tag) {
+    // First check taginfo cache for exact count
+    const cachedCount = getCachedTagCount(tag.key, tag.value);
+    if (cachedCount !== null) {
+        return cachedCount;
+    }
+
+    // Fall back to static key frequency rank
+    // Convert rank to a large count estimate (rank 1 = most common = highest count)
+    if (tag.key in KEY_FREQUENCY_RANK) {
+        const rank = KEY_FREQUENCY_RANK[tag.key];
+        // Invert rank so rank 1 (most common) becomes highest count
+        // Use a base of 1 billion to ensure static ranks sort after taginfo counts
+        return 1_000_000_000 - (rank * 1_000_000);
+    }
+
+    // Unknown keys get count of 0 (least common, sort first)
+    return 0;
+}
+
 /**
  * Sort tags for optimal query performance
- * Order:
- * 1. Key=value pairs NOT on the most used list
- * 2. Generic keys NOT on the most used list
- * 3. Key=value pairs on the most used list
- * 4. Generic keys on the most used list (sorted by frequency, most common last)
+ * Uses taginfo counts when available, falls back to static KEY_FREQUENCY_RANK
+ * Tags are sorted by usage count ascending (least common first)
  *
  * @param {Array} tags - Array of {key, value} objects
  * @returns {Array} Sorted tags array
  */
 function sortTagsForQuery(tags) {
     return [...tags].sort((a, b) => {
-        const aIsCommon = a.key in KEY_FREQUENCY_RANK;
-        const bIsCommon = b.key in KEY_FREQUENCY_RANK;
-        const aHasValue = a.value !== null;
-        const bHasValue = b.value !== null;
-
-        // Calculate priority group (lower = earlier in query)
-        // Group 1: key=value, not common
-        // Group 2: key only, not common
-        // Group 3: key=value, common
-        // Group 4: key only, common
-        const getGroup = (isCommon, hasValue) => {
-            if (!isCommon && hasValue) return 1;
-            if (!isCommon && !hasValue) return 2;
-            if (isCommon && hasValue) return 3;
-            return 4; // common, no value
-        };
-
-        const groupA = getGroup(aIsCommon, aHasValue);
-        const groupB = getGroup(bIsCommon, bHasValue);
-
-        if (groupA !== groupB) {
-            return groupA - groupB;
-        }
-
-        // Within group 4 (common generic keys), sort by frequency (most common last)
-        if (groupA === 4) {
-            const rankA = KEY_FREQUENCY_RANK[a.key];
-            const rankB = KEY_FREQUENCY_RANK[b.key];
-            // Higher rank number (less common) comes first
-            return rankB - rankA;
-        }
-
-        // Within other groups, maintain original order
-        return 0;
+        const countA = getTagSortCount(a);
+        const countB = getTagSortCount(b);
+        // Lower count = less common = should come first
+        return countA - countB;
     });
 }
 
