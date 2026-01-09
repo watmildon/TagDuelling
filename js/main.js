@@ -207,8 +207,9 @@ function handleNewGame() {
 function handleBackToSetup() {
     if (multiplayer.isMultiplayerMode()) {
         multiplayer.sendBackToSetup();
+        multiplayer.reset();
     }
-    state.backToSetup();
+    state.resetToSetup();
 }
 
 /**

@@ -344,13 +344,14 @@ function handleRemotePlayAgain() {
 }
 
 function handleRemoteBackToSetup() {
-    // Guest goes back to waiting state, not setup
-    // (Only host can be on setup screen in multiplayer)
-    state.enterWaitingState();
-
+    // Remote player initiated back to setup - disconnect and reset
     if (onRemoteActionCallback) {
         onRemoteActionCallback('back_to_setup', {});
     }
+
+    // Disconnect from the multiplayer session
+    reset();
+    state.resetToSetup();
 }
 
 function handleRemotePlayerName(message) {
