@@ -5,26 +5,12 @@
 
 const TAGINFO_BASE_URL = 'https://taginfo.openstreetmap.org/api/4';
 
-// Difficulty configurations
-const DIFFICULTY_CONFIG = {
-    easy: {
-        challengeThreshold: 0.02,    // Challenge if to_fraction < 0.1%
-        randomness: 0.4,              // 40% chance of random choice
-        thinkingDelayMs: { min: 1000, max: 2000 },
-        preferRareKeys: false
-    },
-    medium: {
-        challengeThreshold: 0.02,     // Challenge if to_fraction < 1%
-        randomness: 0.15,             // 15% chance of random choice
-        thinkingDelayMs: { min: 800, max: 1500 },
-        preferRareKeys: true
-    },
-    hard: {
-        challengeThreshold: 0.02,     // Challenge if to_fraction < 5%
-        randomness: 0.05,             // 5% chance of random choice
-        thinkingDelayMs: { min: 500, max: 1000 },
-        preferRareKeys: true
-    }
+// Bot configuration
+const BOT_CONFIG = {
+    challengeThreshold: 0.02,     // Challenge if to_fraction < 2%
+    randomness: 0.05,             // 5% chance of random choice
+    thinkingDelayMs: { min: 500, max: 1000 },
+    preferRareKeys: true
 };
 
 // Top 20 common keys with their top 3 uncommon combination keys
@@ -117,27 +103,25 @@ async function fetchPopularKeys() {
 /**
  * Main bot action function - decides whether to add tag or challenge
  * @param {Object} gameState - Current game state
- * @param {Object} botPlayer - The bot player object {name, isBot, difficulty}
  * @returns {Promise<Object>} {action: 'addTag'|'challenge', data?: {key, value}}
  */
-export async function decideBotAction(gameState, botPlayer) {
-    const config = DIFFICULTY_CONFIG[botPlayer.difficulty] || DIFFICULTY_CONFIG.medium;
+export async function decideBotAction(gameState) {
     const existingTags = gameState.tags;
 
     // If no tags yet, bot goes first - pick a starting key
     if (existingTags.length === 0) {
-        const firstTag = await pickFirstTag(config);
+        const firstTag = pickFirstTag();
         return { action: 'addTag', data: firstTag };
     }
 
     // Check if we should challenge
-    const shouldChallenge = await evaluateChallengeDecision(existingTags, config);
+    const shouldChallenge = await evaluateChallengeDecision(existingTags);
     if (shouldChallenge) {
         return { action: 'challenge' };
     }
 
     // Otherwise, add a tag
-    const tagToAdd = await pickNextTag(existingTags, config);
+    const tagToAdd = await pickNextTag(existingTags);
     return { action: 'addTag', data: tagToAdd };
 }
 
@@ -145,7 +129,7 @@ export async function decideBotAction(gameState, botPlayer) {
  * Pick the first tag when game starts
  * Always use local fallback list for instant response - no API call needed
  */
-function pickFirstTag(config) {
+function pickFirstTag() {
     // Use local list for fast first move - no need to hit API
     const index = Math.floor(Math.random() * COMMON_KEYS.length);
     return { key: COMMON_KEYS[index], value: null };
@@ -155,7 +139,7 @@ function pickFirstTag(config) {
  * Pick the next tag to add based on existing tags
  * Uses TagInfo combinations API to find co-occurring keys
  */
-async function pickNextTag(existingTags, config) {
+async function pickNextTag(existingTags) {
     try {
         // Check if any tags need values specified
         const keyOnlyTags = existingTags.filter(t => t.value === null);
@@ -164,23 +148,23 @@ async function pickNextTag(existingTags, config) {
         if (keyOnlyTags.length > 0 && roll > 0.15) {
             // 85% chance to specify a value for existing key-only tag
             console.log(`Bot: Deciding to specify value for "${keyOnlyTags[0].key}"`);
-            return await pickValueForKey(keyOnlyTags[0].key, existingTags, config);
+            return await pickValueForKey(keyOnlyTags[0].key, existingTags);
         }
 
         // Find keys that co-occur with existing tags
-        const candidates = await findCombinedKeyCandidates(existingTags, config);
+        const candidates = await findCombinedKeyCandidates(existingTags);
 
         if (candidates.length === 0) {
             // No good candidates - use fallback
-            return pickFallbackTag(existingTags, config);
+            return pickFallbackTag(existingTags);
         }
 
-        // Pick from candidates based on difficulty
-        return pickFromCandidates(candidates, config);
+        // Pick from candidates
+        return pickFromCandidates(candidates);
 
     } catch (error) {
         console.warn('Bot: TagInfo API error, using fallback:', error);
-        return pickFallbackTag(existingTags, config);
+        return pickFallbackTag(existingTags);
     }
 }
 
@@ -213,7 +197,7 @@ export function clearCombinationCache() {
  * Find keys that commonly co-occur with ALL existing tags
  * Scores candidates based on how well they combine with multiple tags
  */
-async function findCombinedKeyCandidates(existingTags, config) {
+async function findCombinedKeyCandidates(existingTags) {
     const existingKeys = new Set(existingTags.map(t => t.key));
 
     // Fetch combinations for ALL existing tags (using cache)
@@ -270,14 +254,8 @@ async function findCombinedKeyCandidates(existingTags, config) {
         if (b.tagMatches !== a.tagMatches) {
             return b.tagMatches - a.tagMatches;
         }
-        // Second priority: depends on difficulty
-        if (config.preferRareKeys) {
-            // Hard mode: prefer lower minFraction (rarer combinations)
-            return a.minFraction - b.minFraction;
-        } else {
-            // Easy mode: prefer higher totalScore (more common combinations)
-            return b.totalScore - a.totalScore;
-        }
+        // Prefer lower minFraction (rarer combinations)
+        return a.minFraction - b.minFraction;
     });
 
     // Log what we found for debugging
@@ -292,16 +270,16 @@ async function findCombinedKeyCandidates(existingTags, config) {
 /**
  * Pick from candidate keys
  */
-function pickFromCandidates(candidates, config) {
-    // Add randomness based on difficulty
-    if (Math.random() < config.randomness) {
+function pickFromCandidates(candidates) {
+    // Small chance of randomness
+    if (Math.random() < BOT_CONFIG.randomness) {
         // Random pick from candidates
         const randomCandidate = candidates[Math.floor(Math.random() * candidates.length)];
         console.log(`Bot: Randomly picked "${randomCandidate.key}" (matches ${randomCandidate.tagMatches} tags)`);
         return { key: randomCandidate.key, value: null };
     }
 
-    // Strategic pick - prefer top candidate (most or least common depending on sort)
+    // Strategic pick - prefer top candidate
     const topCandidate = candidates[0];
     console.log(`Bot: Strategically picked "${topCandidate.key}" (matches ${topCandidate.tagMatches} tags, minFraction=${topCandidate.minFraction.toFixed(4)})`);
     return { key: topCandidate.key, value: null };
@@ -311,7 +289,7 @@ function pickFromCandidates(candidates, config) {
  * Pick a value for a key-only tag
  * Prefers common values to keep game going longer
  */
-async function pickValueForKey(key, existingTags, config) {
+async function pickValueForKey(key, existingTags) {
     try {
         console.log(`Bot: Fetching values for key "${key}"...`);
         const values = await fetchKeyValues(key);
@@ -320,14 +298,14 @@ async function pickValueForKey(key, existingTags, config) {
         if (values.length === 0) {
             // No values found, add a different key instead
             console.log(`Bot: No values found for "${key}", falling back to new key`);
-            return pickFallbackTag(existingTags, config);
+            return pickFallbackTag(existingTags);
         }
 
         // Focus on the most common values (top 5) for safety
         const topValues = values.slice(0, 5);
 
         // Small chance of randomness - pick from top 10 instead
-        if (Math.random() < config.randomness) {
+        if (Math.random() < BOT_CONFIG.randomness) {
             const extendedPool = values.slice(0, 10);
             const randomValue = extendedPool[Math.floor(Math.random() * extendedPool.length)];
             console.log(`Bot: Randomly picked value "${randomValue.value}" for "${key}"`);
@@ -343,7 +321,7 @@ async function pickValueForKey(key, existingTags, config) {
 
     } catch (error) {
         console.warn('Bot: Failed to get values for key, adding new key instead:', error);
-        return pickFallbackTag(existingTags, config);
+        return pickFallbackTag(existingTags);
     }
 }
 
@@ -352,7 +330,7 @@ async function pickValueForKey(key, existingTags, config) {
  * Strategy: Look for existing common keys and add one of their known combinations
  * If no common keys exist, add a common key at random
  */
-function pickFallbackTag(existingTags, config) {
+function pickFallbackTag(existingTags) {
     const existingKeys = new Set(existingTags.map(t => t.key));
 
     // First, look for existing common keys that have known combinations
@@ -421,7 +399,7 @@ function pickFallbackTag(existingTags, config) {
  * Evaluate whether bot should challenge
  * Returns true if the combination seems unlikely to exist
  */
-async function evaluateChallengeDecision(existingTags, config) {
+async function evaluateChallengeDecision(existingTags) {
     // Never challenge on first tag
     if (existingTags.length <= 1) {
         return false;
@@ -445,10 +423,10 @@ async function evaluateChallengeDecision(existingTags, config) {
                 if (Math.random() < 0.5) {
                     return true;
                 }
-            } else if (combo.to_fraction < config.challengeThreshold) {
+            } else if (combo.to_fraction < BOT_CONFIG.challengeThreshold) {
                 // Co-occurrence below threshold
                 // Challenge probability increases with lower fraction
-                const challengeProbability = 1 - (combo.to_fraction / config.challengeThreshold);
+                const challengeProbability = 1 - (combo.to_fraction / BOT_CONFIG.challengeThreshold);
                 if (Math.random() < challengeProbability * 0.7) {
                     return true;
                 }
@@ -475,11 +453,9 @@ async function evaluateChallengeDecision(existingTags, config) {
 
 /**
  * Get artificial "thinking" delay for better UX
- * @param {string} difficulty - 'easy' | 'medium' | 'hard'
  * @returns {number} Delay in milliseconds
  */
-export function getThinkingDelay(difficulty) {
-    const config = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.medium;
-    const { min, max } = config.thinkingDelayMs;
+export function getThinkingDelay() {
+    const { min, max } = BOT_CONFIG.thinkingDelayMs;
     return Math.random() * (max - min) + min;
 }

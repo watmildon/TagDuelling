@@ -509,10 +509,7 @@ function renderSetupScreen(currentState) {
         },
         (index) => state.removePlayer(index),
         (index, isBot) => {
-            // Assign random difficulty when toggling to bot
-            const difficulties = ['easy', 'medium', 'hard'];
-            const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
-            state.setPlayerAsBot(index, isBot, randomDifficulty);
+            state.setPlayerAsBot(index, isBot);
         },
         hasRegion || isMultiplayerMode, // Disable bot toggles if region is selected or in multiplayer
         multiplayerOptions
@@ -757,7 +754,7 @@ async function executeBotTurn() {
     ui.showBotThinking();
 
     // Add artificial delay for UX
-    const delay = bot.getThinkingDelay(currentPlayer.difficulty);
+    const delay = bot.getThinkingDelay();
     await new Promise(resolve => setTimeout(resolve, delay));
 
     try {

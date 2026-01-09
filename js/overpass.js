@@ -360,7 +360,7 @@ function buildTagFilters(tags) {
  */
 export function buildCountQuery(tags, region = null) {
     const tagFilters = buildTagFilters(tags);
-    const timeout = region ? 10 : 5;
+    const timeout = region ? 15 : 30;
 
     if (region && region.relationId) {
         // Use relation ID directly

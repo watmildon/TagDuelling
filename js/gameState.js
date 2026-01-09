@@ -319,14 +319,12 @@ export function backToSetup() {
  * Toggle a player between human and bot
  * @param {number} index - Player index
  * @param {boolean} isBot - Whether player is a bot
- * @param {string} difficulty - 'easy' | 'medium' | 'hard'
  */
-export function setPlayerAsBot(index, isBot, difficulty = 'medium') {
+export function setPlayerAsBot(index, isBot) {
     if (index >= 0 && index < state.players.length) {
         state.players[index] = {
             ...state.players[index],
-            isBot,
-            difficulty: isBot ? difficulty : undefined
+            isBot
         };
         // Update name to indicate bot
         if (isBot) {
@@ -336,19 +334,6 @@ export function setPlayerAsBot(index, isBot, difficulty = 'medium') {
         } else {
             state.players[index].name = `Player ${index + 1}`;
         }
-        notifySubscribers();
-    }
-}
-
-/**
- * Update bot difficulty
- * @param {number} index - Player index
- * @param {string} difficulty - 'easy' | 'medium' | 'hard'
- */
-export function setBotDifficulty(index, difficulty) {
-    if (index >= 0 && index < state.players.length && state.players[index].isBot) {
-        state.players[index].difficulty = difficulty;
-        // Keep the existing bot name, don't change it
         notifySubscribers();
     }
 }
