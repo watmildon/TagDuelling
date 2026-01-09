@@ -526,7 +526,8 @@ function renderGameScreen(currentState) {
     ui.renderCurrentPlayer(
         state.getCurrentPlayer(),
         currentState.players,
-        currentState.currentPlayerIndex
+        currentState.currentPlayerIndex,
+        currentState.tags
     );
     ui.renderTagPool(currentState.tags);
 
