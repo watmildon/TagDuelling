@@ -508,8 +508,12 @@ function renderSetupScreen(currentState) {
             }
         },
         (index) => state.removePlayer(index),
-        (index, isBot) => state.setPlayerAsBot(index, isBot),
-        (index, difficulty) => state.setBotDifficulty(index, difficulty),
+        (index, isBot) => {
+            // Assign random difficulty when toggling to bot
+            const difficulties = ['easy', 'medium', 'hard'];
+            const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+            state.setPlayerAsBot(index, isBot, randomDifficulty);
+        },
         hasRegion || isMultiplayerMode, // Disable bot toggles if region is selected or in multiplayer
         multiplayerOptions
     );

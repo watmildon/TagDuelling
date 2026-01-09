@@ -81,11 +81,10 @@ export function showScreen(screenName) {
  * @param {Function} onNameChange - Callback for name changes
  * @param {Function} onRemove - Callback for removing player
  * @param {Function} onBotToggle - Callback for bot toggle (optional)
- * @param {Function} onDifficultyChange - Callback for difficulty change (optional)
  * @param {boolean} disableBotToggles - Whether bot toggles should be disabled (region selected)
  * @param {Object} multiplayerOptions - Multiplayer mode options { isMultiplayer, localPlayerIndex }
  */
-export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, onDifficultyChange = null, disableBotToggles = false, multiplayerOptions = null) {
+export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = null, disableBotToggles = false, multiplayerOptions = null) {
     elements.playerList.innerHTML = '';
 
     const isMultiplayer = multiplayerOptions?.isMultiplayer || false;
@@ -165,21 +164,6 @@ export function renderPlayerList(players, onNameChange, onRemove, onBotToggle = 
             }
         });
         playerItem.appendChild(input);
-
-        // Difficulty selector (only for bots, not in multiplayer)
-        if (player.isBot && onDifficultyChange && !isMultiplayer) {
-            const difficultySelect = document.createElement('select');
-            difficultySelect.className = 'bot-difficulty';
-            ['easy', 'medium', 'hard'].forEach(diff => {
-                const option = document.createElement('option');
-                option.value = diff;
-                option.textContent = diff.charAt(0).toUpperCase() + diff.slice(1);
-                option.selected = player.difficulty === diff;
-                difficultySelect.appendChild(option);
-            });
-            difficultySelect.addEventListener('change', (e) => onDifficultyChange(index, e.target.value));
-            playerItem.appendChild(difficultySelect);
-        }
 
         // Only show remove button if more than 2 players and not in multiplayer
         if (players.length > 2 && !isMultiplayer) {
