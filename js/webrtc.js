@@ -16,16 +16,58 @@ let onConnectedCallback = null;
 let onDisconnectedCallback = null;
 let onStateChangeCallback = null;
 
-// ICE servers (STUN only - no TURN needed for most connections)
-const ICE_SERVERS = {
+// Cloudflare Worker URL for TURN credentials
+const TURN_CREDENTIAL_URL = 'https://tag-duelling.matthew-whilden.workers.dev/generate-turn-creds';
+
+// Fallback ICE servers (STUN only) if TURN fetch fails
+const FALLBACK_ICE_SERVERS = {
     iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:stun.l.google.com:19302' }
     ]
 };
 
+// Cached ICE servers config (populated by fetchTurnCredentials)
+let cachedIceServers = null;
+
 // Timeout for ICE gathering (ms)
 const ICE_GATHERING_TIMEOUT = 10000;
+
+/**
+ * Fetch TURN credentials from Cloudflare Worker
+ * @returns {Promise<Object>} ICE servers configuration
+ */
+async function fetchTurnCredentials() {
+    try {
+        const response = await fetch(TURN_CREDENTIAL_URL);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Use response directly as ICE servers config
+        cachedIceServers = {
+            iceServers: [data.iceServers]
+        };
+
+        console.log('WebRTC: TURN credentials fetched successfully');
+        return cachedIceServers;
+    } catch (err) {
+        console.warn('WebRTC: Failed to fetch TURN credentials, using STUN fallback:', err);
+        return FALLBACK_ICE_SERVERS;
+    }
+}
+
+/**
+ * Get ICE servers config (fetches TURN creds if not cached)
+ * @returns {Promise<Object>} ICE servers configuration
+ */
+async function getIceServers() {
+    if (cachedIceServers) {
+        return cachedIceServers;
+    }
+    return await fetchTurnCredentials();
+}
 
 /**
  * Set callback for incoming messages
@@ -86,6 +128,39 @@ export function getIsHost() {
 }
 
 /**
+ * Set up peer connection event handlers for diagnostics
+ * @param {RTCPeerConnection} pc
+ */
+function setupPeerConnectionHandlers(pc) {
+    pc.oniceconnectionstatechange = () => {
+        console.log('WebRTC: ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed') {
+            console.error('WebRTC: ICE connection failed - check network/firewall');
+        } else if (pc.iceConnectionState === 'disconnected') {
+            console.warn('WebRTC: ICE connection disconnected');
+        }
+    };
+
+    pc.onconnectionstatechange = () => {
+        console.log('WebRTC: Connection state:', pc.connectionState);
+        if (pc.connectionState === 'failed') {
+            console.error('WebRTC: Connection failed');
+            setState('disconnected');
+            if (onDisconnectedCallback) {
+                onDisconnectedCallback();
+            }
+        }
+    };
+
+    pc.onicecandidateerror = (event) => {
+        // Only log significant errors (not STUN timeouts which are normal)
+        if (event.errorCode !== 701) {
+            console.warn('WebRTC: ICE candidate error:', event.errorCode, event.errorText);
+        }
+    };
+}
+
+/**
  * Create a new peer connection as host and generate offer token
  * @returns {Promise<string>} Base64 encoded offer token
  */
@@ -96,8 +171,10 @@ export async function createOffer() {
     // Clean up any existing connection
     cleanup();
 
-    // Create new peer connection
-    peerConnection = new RTCPeerConnection(ICE_SERVERS);
+    // Fetch TURN credentials and create peer connection
+    const iceServers = await getIceServers();
+    peerConnection = new RTCPeerConnection(iceServers);
+    setupPeerConnectionHandlers(peerConnection);
 
     // Create data channel (host creates it)
     dataChannel = peerConnection.createDataChannel('game', {
@@ -145,8 +222,10 @@ export async function acceptOffer(offerToken) {
         throw new Error('Token is not an offer');
     }
 
-    // Create new peer connection
-    peerConnection = new RTCPeerConnection(ICE_SERVERS);
+    // Fetch TURN credentials and create peer connection
+    const iceServers = await getIceServers();
+    peerConnection = new RTCPeerConnection(iceServers);
+    setupPeerConnectionHandlers(peerConnection);
 
     // Handle incoming data channel (guest receives it)
     peerConnection.ondatachannel = (event) => {
