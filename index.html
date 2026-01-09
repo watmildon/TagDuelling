@@ -115,9 +115,11 @@
                     <div class="room-code-display">
                         <span id="host-room-code" class="room-code">......</span>
                     </div>
-                    <p class="waiting-text">Waiting for opponent to join...</p>
-                    <div class="loading-spinner-small"></div>
-                    <button id="host-cancel-btn" class="btn btn-link">Cancel</button>
+                    <div class="host-status">
+                        <p id="host-status-text" class="waiting-text">Retrieving room code...</p>
+                        <div class="loading-spinner-small"></div>
+                        <button id="host-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
                 </div>
 
                 <!-- Join Flow -->
@@ -128,7 +130,7 @@
                         <button id="join-btn" class="btn btn-primary">Join</button>
                     </div>
                     <p id="join-status" class="join-status"></p>
-                    <button id="join-cancel-btn" class="btn btn-link">Cancel</button>
+                    <button id="join-cancel-btn" class="btn btn-secondary">Cancel</button>
                 </div>
 
                 <!-- Connected State -->
@@ -137,7 +139,7 @@
                         <span class="connected-indicator"></span>
                         <span>Connected to opponent!</span>
                     </div>
-                    <button id="disconnect-btn" class="btn btn-link">Disconnect</button>
+                    <button id="disconnect-btn" class="btn btn-secondary">Disconnect</button>
                 </div>
             </div>
         </section>
@@ -161,7 +163,7 @@
                 <h2>Waiting for Host</h2>
                 <p class="waiting-message">The host is setting up the game. The game will start automatically when they're ready.</p>
 
-                <button id="leave-game-btn" class="btn btn-link">Leave Game</button>
+                <button id="leave-game-btn" class="btn btn-secondary">Leave Game</button>
             </div>
         </section>
 
@@ -184,7 +186,7 @@
                 <button id="challenge-btn" class="btn btn-danger">Challenge!</button>
             </div>
 
-            <button id="back-to-setup-btn" class="btn btn-link">Back to Setup</button>
+            <button id="back-to-setup-btn" class="btn btn-secondary">Back to Setup</button>
         </section>
 
         <!-- Results Screen -->

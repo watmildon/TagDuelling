@@ -397,16 +397,14 @@ export function clearEditableInputs() {
  * @param {string} ultraLink - Link to Ultra
  */
 export function renderResults(result, tags, ultraLink) {
-    // Set icon
+    // Set icon - always celebratory since we're announcing the winner
     elements.resultIcon.className = 'result-icon';
-    // We show from challenger's perspective
+    elements.resultIcon.classList.add('winner');
+    elements.resultTitle.textContent = `${result.winner} Wins!`;
+
     if (result.challengerWon) {
-        elements.resultIcon.classList.add('winner');
-        elements.resultTitle.textContent = `${result.winner} Wins!`;
         elements.resultMessage.textContent = `The challenge was successful! No objects exist with these tags.`;
     } else {
-        elements.resultIcon.classList.add('loser');
-        elements.resultTitle.textContent = `${result.winner} Wins!`;
         elements.resultMessage.textContent = `The challenge failed! Objects exist with these tags.`;
     }
 

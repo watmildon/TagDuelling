@@ -316,6 +316,7 @@ body[data-theme="dark"] .theme-icon::before {
     width: 100%;
     padding: 1rem;
     font-size: 1.125rem;
+    margin-bottom: 1.5rem;
 }
 
 /* Screens */
@@ -421,6 +422,21 @@ body[data-theme="dark"] .theme-icon::before {
 }
 
 .warning-message.hidden {
+    display: none;
+}
+
+/* Info Message */
+.info-message {
+    background-color: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-primary));
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--accent-primary);
+}
+
+.info-message.hidden {
     display: none;
 }
 
@@ -982,6 +998,11 @@ body[data-theme="dark"] .theme-icon::before {
     display: none;
 }
 
+#multiplayer-join #join-cancel-btn {
+    display: block;
+    margin: 0.75rem auto 0;
+}
+
 .multiplayer-buttons {
     display: flex;
     gap: 1rem;
@@ -1092,6 +1113,14 @@ body[data-theme="dark"] .theme-icon::before {
     font-size: 0.85rem;
     font-style: italic;
     margin-top: 0.5rem;
+}
+
+.host-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
 }
 
 .connected-status {

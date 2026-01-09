@@ -11,6 +11,7 @@ let isHost = false;
 let connectionState = 'disconnected'; // disconnected, connecting, connected
 let currentRoomCode = null;
 let pollingInterval = null;
+let intentionalDisconnect = false; // Track user-initiated disconnects
 
 // Callbacks
 let onMessageCallback = null;
@@ -162,7 +163,7 @@ function setupPeerConnectionHandlers(pc) {
         if (pc.connectionState === 'failed') {
             console.error('WebRTC: Connection failed');
             setState('disconnected');
-            if (onDisconnectedCallback) {
+            if (onDisconnectedCallback && !intentionalDisconnect) {
                 onDisconnectedCallback();
             }
         }
@@ -183,6 +184,7 @@ function setupPeerConnectionHandlers(pc) {
  */
 export async function createRoom() {
     isHost = true;
+    intentionalDisconnect = false; // Reset for new connection
     setState('connecting');
 
     // Clean up any existing connection
@@ -301,6 +303,7 @@ export function stopPolling() {
  */
 export async function joinRoom(code) {
     isHost = false;
+    intentionalDisconnect = false; // Reset for new connection
     setState('connecting');
 
     // Clean up any existing connection first
@@ -460,7 +463,7 @@ function setupDataChannel(channel) {
     channel.onclose = () => {
         console.log('WebRTC: Data channel closed');
         setState('disconnected');
-        if (onDisconnectedCallback) {
+        if (onDisconnectedCallback && !intentionalDisconnect) {
             onDisconnectedCallback();
         }
     };
@@ -532,8 +535,9 @@ export function cleanup() {
 }
 
 /**
- * Disconnect and clean up
+ * Disconnect and clean up (user-initiated)
  */
 export function disconnect() {
+    intentionalDisconnect = true;
     cleanup();
 }
