@@ -24,6 +24,7 @@ function getRandomBotName() {
 // Game phases
 export const PHASES = {
     SETUP: 'setup',
+    WAITING: 'waiting', // Guest waiting for host to start the game
     PLAYING: 'playing',
     CHALLENGE: 'challenge',
     FINISHED: 'finished'
@@ -208,6 +209,14 @@ export function getKeyOnlyTags() {
  */
 export function nextTurn() {
     state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+    notifySubscribers();
+}
+
+/**
+ * Enter waiting state (for multiplayer guests)
+ */
+export function enterWaitingState() {
+    state.gamePhase = PHASES.WAITING;
     notifySubscribers();
 }
 
