@@ -64,24 +64,14 @@ function initMultiplayerElements() {
         connectedSection: document.getElementById('multiplayer-connected'),
 
         // Host flow
-        hostStep1: document.getElementById('host-step-1'),
-        hostStep2: document.getElementById('host-step-2'),
-        hostStep3: document.getElementById('host-step-3'),
-        hostOfferToken: document.getElementById('host-offer-token'),
-        hostAnswerInput: document.getElementById('host-answer-input'),
-        copyOfferBtn: document.getElementById('copy-offer-btn'),
-        hostConnectBtn: document.getElementById('host-connect-btn'),
+        hostRoomCode: document.getElementById('host-room-code'),
         hostCancelBtn: document.getElementById('host-cancel-btn'),
 
         // Join flow
-        joinStep1: document.getElementById('join-step-1'),
-        joinStep2: document.getElementById('join-step-2'),
-        joinStep3: document.getElementById('join-step-3'),
-        joinOfferInput: document.getElementById('join-offer-input'),
-        joinAnswerToken: document.getElementById('join-answer-token'),
-        joinAcceptBtn: document.getElementById('join-accept-btn'),
-        copyAnswerBtn: document.getElementById('copy-answer-btn'),
+        joinCodeInput: document.getElementById('join-code-input'),
+        joinBtn: document.getElementById('join-btn'),
         joinCancelBtn: document.getElementById('join-cancel-btn'),
+        joinStatus: document.getElementById('join-status'),
 
         // Buttons
         hostGameBtn: document.getElementById('host-game-btn'),
@@ -163,15 +153,24 @@ function bindEvents(elements) {
 function bindMultiplayerEvents() {
     // Host flow
     mpElements.hostGameBtn.addEventListener('click', handleHostGame);
-    mpElements.copyOfferBtn.addEventListener('click', () => copyToClipboard(mpElements.hostOfferToken.value, mpElements.copyOfferBtn));
-    mpElements.hostConnectBtn.addEventListener('click', handleHostConnect);
     mpElements.hostCancelBtn.addEventListener('click', resetMultiplayerUI);
 
     // Join flow
     mpElements.joinGameBtn.addEventListener('click', handleJoinGame);
-    mpElements.joinAcceptBtn.addEventListener('click', handleJoinAccept);
-    mpElements.copyAnswerBtn.addEventListener('click', () => copyToClipboard(mpElements.joinAnswerToken.value, mpElements.copyAnswerBtn));
+    mpElements.joinBtn.addEventListener('click', handleJoinRoom);
     mpElements.joinCancelBtn.addEventListener('click', resetMultiplayerUI);
+
+    // Allow Enter key in room code input
+    mpElements.joinCodeInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleJoinRoom();
+        }
+    });
+
+    // Auto-uppercase room code input
+    mpElements.joinCodeInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
 
     // Connected state
     mpElements.disconnectBtn.addEventListener('click', handleDisconnect);
@@ -213,40 +212,32 @@ function handleBackToSetup() {
 }
 
 /**
- * Handle Host Game button - start hosting
+ * Handle Host Game button - create room and show code
  */
 async function handleHostGame() {
     showMultiplayerSection('host');
-    showHostStep(1);
+    mpElements.hostRoomCode.textContent = '......';
 
     try {
-        const offerToken = await webrtc.createOffer();
-        mpElements.hostOfferToken.value = offerToken;
-        showHostStep(2);
-        showHostStep(3);
+        const roomCode = await webrtc.createRoom();
+        mpElements.hostRoomCode.textContent = roomCode;
+
+        // Start polling for guest to join
+        webrtc.waitForGuest(() => {
+            // Timeout callback
+            ui.showError('Room expired. Please create a new room.');
+            resetMultiplayerUI();
+        }).catch(err => {
+            if (err.message !== 'Room expired') {
+                console.error('Waiting for guest failed:', err);
+            }
+        });
+        // Connection will be established via onConnected callback when guest joins
+
     } catch (error) {
-        console.error('Failed to create offer:', error);
-        ui.showError('Failed to create connection. Please try again.');
+        console.error('Failed to create room:', error);
+        ui.showError('Failed to create room. Please try again.');
         resetMultiplayerUI();
-    }
-}
-
-/**
- * Handle Host Connect button - accept answer token
- */
-async function handleHostConnect() {
-    const answerToken = mpElements.hostAnswerInput.value.trim();
-    if (!answerToken) {
-        ui.showError('Please paste the response token from your opponent.');
-        return;
-    }
-
-    try {
-        await webrtc.acceptAnswer(answerToken);
-        // Connection will be established, onConnected callback will handle UI
-    } catch (error) {
-        console.error('Failed to accept answer:', error);
-        ui.showError('Invalid response token. Please check and try again.');
     }
 }
 
@@ -255,30 +246,38 @@ async function handleHostConnect() {
  */
 function handleJoinGame() {
     showMultiplayerSection('join');
-    showJoinStep(1);
+    mpElements.joinCodeInput.value = '';
+    mpElements.joinStatus.textContent = '';
+    mpElements.joinCodeInput.focus();
 }
 
 /**
- * Handle Join Accept button - accept offer and generate answer
+ * Handle Join Room button - join with room code
  */
-async function handleJoinAccept() {
-    const offerToken = mpElements.joinOfferInput.value.trim();
-    if (!offerToken) {
-        ui.showError('Please paste the invite token from the host.');
+async function handleJoinRoom() {
+    const code = mpElements.joinCodeInput.value.trim();
+    if (!code) {
+        ui.showError('Please enter a room code.');
         return;
     }
 
-    showJoinStep(2);
+    if (code.length !== 6) {
+        ui.showError('Room code must be 6 characters.');
+        return;
+    }
+
+    mpElements.joinStatus.textContent = 'Joining...';
+    mpElements.joinBtn.disabled = true;
 
     try {
-        const answerToken = await webrtc.acceptOffer(offerToken);
-        mpElements.joinAnswerToken.value = answerToken;
-        showJoinStep(3);
-        // Connection will be established when host accepts our answer
+        await webrtc.joinRoom(code);
+        mpElements.joinStatus.textContent = 'Waiting for connection...';
+        // Connection will be established via onConnected callback
     } catch (error) {
-        console.error('Failed to accept offer:', error);
-        ui.showError('Invalid invite token. Please check and try again.');
-        showJoinStep(1);
+        console.error('Failed to join room:', error);
+        mpElements.joinStatus.textContent = '';
+        mpElements.joinBtn.disabled = false;
+        ui.showError(error.message || 'Failed to join room. Please check the code and try again.');
     }
 }
 
@@ -397,50 +396,15 @@ function showMultiplayerSection(section) {
 }
 
 /**
- * Show specific host step
- */
-function showHostStep(step) {
-    mpElements.hostStep1.classList.toggle('hidden', step !== 1);
-    mpElements.hostStep2.classList.toggle('hidden', step < 2);
-    mpElements.hostStep3.classList.toggle('hidden', step < 3);
-}
-
-/**
- * Show specific join step
- */
-function showJoinStep(step) {
-    mpElements.joinStep1.classList.toggle('hidden', step !== 1);
-    mpElements.joinStep2.classList.toggle('hidden', step !== 2);
-    mpElements.joinStep3.classList.toggle('hidden', step !== 3);
-}
-
-/**
  * Reset multiplayer UI to default state
  */
 function resetMultiplayerUI() {
     showMultiplayerSection('default');
-    mpElements.hostOfferToken.value = '';
-    mpElements.hostAnswerInput.value = '';
-    mpElements.joinOfferInput.value = '';
-    mpElements.joinAnswerToken.value = '';
+    mpElements.joinCodeInput.value = '';
+    mpElements.joinStatus.textContent = '';
+    mpElements.joinBtn.disabled = false;
+    mpElements.hostRoomCode.textContent = '';
     webrtc.cleanup();
-}
-
-/**
- * Copy text to clipboard
- */
-async function copyToClipboard(text, button) {
-    try {
-        await navigator.clipboard.writeText(text);
-        const originalText = button.textContent;
-        button.textContent = 'Copied!';
-        setTimeout(() => {
-            button.textContent = originalText;
-        }, 2000);
-    } catch (error) {
-        console.error('Failed to copy:', error);
-        ui.showError('Failed to copy to clipboard.');
-    }
 }
 
 // Track if bot turn is in progress to prevent double execution
