@@ -618,5 +618,5 @@ export function setGameControlsEnabled(isLocalTurn) {
     inputs.forEach(input => input.disabled = !isLocalTurn);
 
     // Add visual indication when it's not the local player's turn
-    elements.currentPlayer.classList.toggle('waiting-for-opponent', !isLocalTurn);
+    elements.currentPlayerContainer.classList.toggle('waiting-for-opponent', !isLocalTurn);
 }
