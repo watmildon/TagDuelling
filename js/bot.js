@@ -3,6 +3,8 @@
  * Handles bot AI logic and TagInfo API integration
  */
 
+import { getCachedTagCount } from './overpass.js';
+
 const TAGINFO_BASE_URL = 'https://taginfo.openstreetmap.org/api/4';
 
 // Bot configuration
@@ -400,12 +402,22 @@ function pickFallbackTag(existingTags) {
  * Returns true if the combination seems unlikely to exist
  */
 async function evaluateChallengeDecision(existingTags) {
-    // Never challenge on first tag
+    // Check if any tag has zero usage in taginfo cache - always challenge
+    // This check happens first, even for single tags
+    for (const tag of existingTags) {
+        const cachedCount = getCachedTagCount(tag.key, tag.value);
+        if (cachedCount === 0) {
+            console.log(`Bot: Tag "${tag.key}${tag.value ? '=' + tag.value : ''}" has 0 usage - challenging!`);
+            return true;
+        }
+    }
+
+    // Don't challenge on first tag (unless it has zero usage, checked above)
     if (existingTags.length <= 1) {
         return false;
     }
 
-    // Need at least 2 tags before considering a challenge
+    // Need at least 2 tags before considering other challenge heuristics
     const lastTag = existingTags[existingTags.length - 1];
     const otherTags = existingTags.slice(0, -1);
 
