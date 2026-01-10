@@ -149,13 +149,31 @@ export function setRegion(regionData) {
 }
 
 /**
+ * Strip surrounding quotes from a string
+ * Handles: "value", 'value', and nested like ""value""
+ * @param {string} str - String to strip quotes from
+ * @returns {string} String with surrounding quotes removed
+ */
+function stripQuotes(str) {
+    let result = str;
+    // Keep stripping while surrounded by matching quotes
+    while (
+        (result.startsWith('"') && result.endsWith('"')) ||
+        (result.startsWith("'") && result.endsWith("'"))
+    ) {
+        result = result.slice(1, -1);
+    }
+    return result;
+}
+
+/**
  * Add a new tag to the pool
  * @param {string} key - Tag key
  * @param {string|null} value - Tag value (null for "any")
  * @returns {boolean} Success
  */
 export function addTag(key, value = null) {
-    const trimmedKey = key.trim().toLowerCase();
+    const trimmedKey = stripQuotes(key.trim()).toLowerCase();
     if (!trimmedKey) {
         return false;
     }
@@ -166,7 +184,7 @@ export function addTag(key, value = null) {
         return false; // Key already exists
     }
 
-    const trimmedValue = value ? value.trim() : null;
+    const trimmedValue = value ? stripQuotes(value.trim()) : null;
     state.tags.push({
         key: trimmedKey,
         value: trimmedValue
@@ -186,8 +204,8 @@ export function addTag(key, value = null) {
  * @returns {boolean} Success
  */
 export function specifyTagValue(key, value) {
-    const trimmedKey = key.trim().toLowerCase();
-    const trimmedValue = value.trim();
+    const trimmedKey = stripQuotes(key.trim()).toLowerCase();
+    const trimmedValue = stripQuotes(value.trim());
 
     if (!trimmedKey || !trimmedValue) {
         return false;
