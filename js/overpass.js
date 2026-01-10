@@ -220,7 +220,7 @@ function getTagCacheKey(key, value) {
  * @param {string|null} value - Tag value or null
  * @returns {number|null} Cached count or null if not cached/expired
  */
-function getCachedTagCount(key, value) {
+export function getCachedTagCount(key, value) {
     const cacheKey = getTagCacheKey(key, value);
     const entry = taginfoCache.get(cacheKey);
 
