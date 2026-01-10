@@ -333,6 +333,24 @@ function sortTagsForQuery(tags) {
     });
 }
 
+// Threshold for breaking out rare tags into separate filter steps
+// Tags with fewer than this many elements get their own nwr step
+const RARE_TAG_THRESHOLD = 1000;
+
+/**
+ * Build a single tag filter string
+ * @param {Object} tag - Tag object with key and value
+ * @returns {string} Filter like ["key"="value"] or ["key"]
+ */
+function buildSingleTagFilter(tag) {
+    if (tag.value !== null) {
+        const escapedValue = tag.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        return `["${tag.key}"="${escapedValue}"]`;
+    } else {
+        return `["${tag.key}"]`;
+    }
+}
+
 /**
  * Build tag filters string from tags array
  * @param {Array} tags - Array of {key, value} objects
@@ -340,69 +358,121 @@ function sortTagsForQuery(tags) {
  */
 function buildTagFilters(tags) {
     const sortedTags = sortTagsForQuery(tags);
-    return sortedTags.map(tag => {
-        if (tag.value !== null) {
-            // Escape special characters in value
-            const escapedValue = tag.value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            return `["${tag.key}"="${escapedValue}"]`;
+    return sortedTags.map(buildSingleTagFilter).join('');
+}
+
+/**
+ * Partition tags into rare (should be filtered first) and common
+ * Rare tags have known counts below RARE_TAG_THRESHOLD
+ * @param {Array} tags - Array of {key, value} objects
+ * @returns {{rareTags: Array, commonTags: Array}} Partitioned tags
+ */
+function partitionTagsByRarity(tags) {
+    const sortedTags = sortTagsForQuery(tags);
+    const rareTags = [];
+    const commonTags = [];
+
+    for (const tag of sortedTags) {
+        const cachedCount = getCachedTagCount(tag.key, tag.value);
+        // Only treat as rare if we have actual taginfo data confirming it's rare
+        if (cachedCount !== null && cachedCount < RARE_TAG_THRESHOLD) {
+            rareTags.push(tag);
         } else {
-            // Key exists with any value
-            return `["${tag.key}"]`;
+            commonTags.push(tag);
         }
-    }).join('');
+    }
+
+    return { rareTags, commonTags };
+}
+
+/**
+ * Build optimized query body using two-step filtering for rare tags
+ * Rare tags (< 10k elements) are filtered into a named set first,
+ * then common tags filter that set. This helps Overpass prune early.
+ *
+ * @param {Array} tags - Array of {key, value} objects
+ * @param {string} baseSelector - Base selector like "nwr" or "nwr(area.searchArea)"
+ * @returns {string} Query body (without header/footer)
+ */
+function buildOptimizedQueryBody(tags, baseSelector) {
+    const { rareTags, commonTags } = partitionTagsByRarity(tags);
+
+    // If no rare tags or only one tag total, use simple query
+    if (rareTags.length === 0 || tags.length === 1) {
+        const allFilters = buildTagFilters(tags);
+        return `${baseSelector}${allFilters}`;
+    }
+
+    // Build two-step query: rare tags first, then filter with common tags
+    const rareFilters = rareTags.map(buildSingleTagFilter).join('');
+    const commonFilters = commonTags.map(buildSingleTagFilter).join('');
+
+    // First step: filter by rare tags into a named set
+    // Second step: filter that set by common tags
+    if (commonTags.length === 0) {
+        // All tags are rare - just use the rare filters directly
+        return `${baseSelector}${rareFilters}`;
+    }
+
+    return `${baseSelector}${rareFilters}->.rareSet;
+nwr.rareSet${commonFilters}`;
 }
 
 /**
  * Build an Overpass QL query to count objects matching tags
+ * Uses two-step filtering for rare tags to optimize query performance
  * @param {Array} tags - Array of {key, value} objects
  * @param {Object|null} region - Region with name/adminLevel or relationId, or null for global
  * @returns {string} Overpass QL query
  */
 export function buildCountQuery(tags, region = null) {
-    const tagFilters = buildTagFilters(tags);
     const timeout = region ? 15 : 30;
 
     if (region && region.relationId) {
         // Use relation ID directly
+        const queryBody = buildOptimizedQueryBody(tags, 'nwr(area.searchArea)');
         return `[out:json][timeout:${timeout}];
 rel(${region.relationId});
 map_to_area->.searchArea;
-nwr(area.searchArea)${tagFilters};
+${queryBody};
 out count;`;
     }
 
     if (region && region.name && region.adminLevel) {
         // Use boundary relation for regional query
         const escapedName = region.name.replace(/"/g, '\\"');
+        const queryBody = buildOptimizedQueryBody(tags, 'nwr(area.searchArea)');
         return `[out:json][timeout:${timeout}];
 rel["type"="boundary"]["name"="${escapedName}"]["admin_level"="${region.adminLevel}"];
 map_to_area->.searchArea;
-nwr(area.searchArea)${tagFilters};
+${queryBody};
 out count;`;
     }
 
     // Global query (no region filter)
+    const queryBody = buildOptimizedQueryBody(tags, 'nwr');
     return `[out:json][timeout:${timeout}];
-nwr${tagFilters};
+${queryBody};
 out count;`;
 }
 
 /**
  * Build a display query (shows actual results, not just count)
+ * Uses two-step filtering for rare tags to optimize query performance
  * @param {Array} tags - Array of {key, value} objects
  * @param {Object|null} region - Region with name/adminLevel or relationId, or null for global
  * @returns {string} Overpass QL query
  */
 export function buildDisplayQuery(tags, region = null) {
-    const tagFilters = buildTagFilters(tags);
     const timeout = region ? 30 : 60;
 
     if (region && region.relationId) {
         // Use relation ID directly
+        const queryBody = buildOptimizedQueryBody(tags, 'nwr(area.searchArea)');
         return `[out:json][timeout:${timeout}];
 rel(${region.relationId});
 map_to_area->.searchArea;
-nwr(area.searchArea)${tagFilters};
+${queryBody};
 out body;
 >;
 out skel qt;`;
@@ -411,18 +481,20 @@ out skel qt;`;
     if (region && region.name && region.adminLevel) {
         // Use boundary relation for regional query
         const escapedName = region.name.replace(/"/g, '\\"');
+        const queryBody = buildOptimizedQueryBody(tags, 'nwr(area.searchArea)');
         return `[out:json][timeout:${timeout}];
 rel["type"="boundary"]["name"="${escapedName}"]["admin_level"="${region.adminLevel}"];
 map_to_area->.searchArea;
-nwr(area.searchArea)${tagFilters};
+${queryBody};
 out body;
 >;
 out skel qt;`;
     }
 
     // Global query (no region filter)
+    const queryBody = buildOptimizedQueryBody(tags, 'nwr');
     return `[out:json][timeout:${timeout}];
-nwr${tagFilters};
+${queryBody};
 out body;
 >;
 out skel qt;`;
