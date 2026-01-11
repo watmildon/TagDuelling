@@ -870,3 +870,68 @@ export function hideSessionScore() {
     if (gameScore) gameScore.classList.add('hidden');
     if (resultsScore) resultsScore.classList.add('hidden');
 }
+
+/**
+ * Update streak display for highscore mode
+ * @param {number} streak - Current win streak
+ * @param {boolean} show - Whether to show the display
+ */
+export function updateStreakDisplay(streak, show = true) {
+    const gameScore = document.getElementById('session-score');
+    const gameScoreText = document.getElementById('session-score-text');
+    const resultsScore = document.getElementById('results-session-score');
+    const resultsScoreText = document.getElementById('results-session-score-text');
+
+    const streakHtml = `<span class="streak-display"><span class="streak-label">Streak:</span> <span class="streak-value">${streak}</span></span>`;
+
+    if (gameScore && gameScoreText) {
+        gameScoreText.innerHTML = streakHtml;
+        gameScore.classList.toggle('hidden', !show);
+    }
+
+    if (resultsScore && resultsScoreText) {
+        resultsScoreText.innerHTML = streakHtml;
+        resultsScore.classList.toggle('hidden', !show);
+    }
+}
+
+/**
+ * Update the Play Again button text based on game mode and result
+ * @param {string} text - Button text to display
+ */
+export function setPlayAgainButtonText(text) {
+    if (elements.playAgainBtn) {
+        elements.playAgainBtn.textContent = text;
+    }
+}
+
+/**
+ * Show "New High Score!" message on results screen
+ * @param {number} score - The new high score achieved
+ */
+export function showNewHighscoreMessage(score) {
+    // Insert message before the results actions
+    const resultsActions = document.querySelector('.results-actions');
+    if (resultsActions) {
+        // Remove any existing highscore message
+        const existing = document.querySelector('.new-highscore');
+        if (existing) {
+            existing.remove();
+        }
+
+        const message = document.createElement('div');
+        message.className = 'new-highscore';
+        message.textContent = `New High Score: ${score}!`;
+        resultsActions.parentNode.insertBefore(message, resultsActions);
+    }
+}
+
+/**
+ * Clear the new highscore message if it exists
+ */
+export function clearNewHighscoreMessage() {
+    const existing = document.querySelector('.new-highscore');
+    if (existing) {
+        existing.remove();
+    }
+}

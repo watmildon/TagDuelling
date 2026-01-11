@@ -1451,3 +1451,89 @@ body[data-theme="dark"] .theme-icon::before {
         font-size: 0.65rem;
     }
 }
+
+/* Highscore Mode Styles */
+.highscore-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #f59e0b, #10b981);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    border: none;
+    width: 100%;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.highscore-display:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.highscore-display:active {
+    transform: translateY(0);
+}
+
+/* Dark mode uses slightly different tones */
+body[data-theme="dark"] .highscore-display {
+    background: linear-gradient(135deg, #d97706, #059669);
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="light"]) .highscore-display {
+        background: linear-gradient(135deg, #d97706, #059669);
+    }
+}
+
+.highscore-label {
+    color: #ffffff;
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.highscore-value {
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.streak-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--tag-value-bg);
+    border-radius: var(--radius-md);
+    font-weight: 600;
+}
+
+.streak-label {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.streak-value {
+    color: var(--accent-success);
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.new-highscore {
+    color: var(--accent-success);
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: var(--tag-value-bg);
+    border-radius: var(--radius-md);
+}

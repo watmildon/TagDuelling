@@ -34,6 +34,11 @@
                 <p class="tagline">The OpenStreetMap Tag Showdown</p>
                 <p class="intro">Think you know OSM tags? Prove it! Take turns adding tags to build a query. But be careful, if the combination you create doesn't exist on OSM, your opponent can call your bluff.</p>
 
+                <button id="highscore-display" class="highscore-display hidden" type="button" aria-label="Start Highscore Mode">
+                    <span class="highscore-label">High Score:</span>
+                    <span id="highscore-value" class="highscore-value">0</span>
+                </button>
+
                 <div class="rules">
                     <h3>How to Play</h3>
                     <ul>
@@ -106,6 +111,17 @@
                         <span class="tooltip-trigger" tabindex="0" role="button" aria-label="More info">
                             <span class="info-icon">?</span>
                             <span class="tooltip-content">Start each round with a random tag. Reduces first-player advantage and exposes you to new tags!</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="setup-option">
+                    <label class="checkbox-option">
+                        <input type="checkbox" id="highscore-mode-checkbox">
+                        <span class="checkbox-label">Highscore Mode</span>
+                        <span class="tooltip-trigger" tabindex="0" role="button" aria-label="More info">
+                            <span class="info-icon">?</span>
+                            <span class="tooltip-content">Play solo against a bot. Win as many rounds as you can before losing. Your best streak becomes your high score!</span>
                         </span>
                     </label>
                 </div>

@@ -19,7 +19,9 @@ const STORAGE_KEYS = {
     REGION: 'tag-duelling-region',
     RELATION_ID: 'tag-duelling-relation-id',
     THEME: 'tag-duelling-theme',
-    TOURNAMENT_MODE: 'tag-duelling-tournament-mode'
+    TOURNAMENT_MODE: 'tag-duelling-tournament-mode',
+    HIGHSCORE: 'tag-duelling-highscore',
+    HIGHSCORE_MODE: 'tag-duelling-highscore-mode'
 };
 
 // Multiplayer UI element references
@@ -184,6 +186,13 @@ function loadPreferences(elements) {
             state.setTournamentMode(true);
         }
     }
+
+    // Load highscore and display if > 0
+    updateHighscoreDisplay();
+
+    // Note: We don't auto-restore highscore mode checkbox state on load
+    // because the player configuration (bot setup) would need special handling.
+    // Instead, players explicitly enable highscore mode each session.
 }
 
 /**
@@ -203,6 +212,18 @@ function bindEvents(elements) {
     const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
     if (tournamentCheckbox) {
         tournamentCheckbox.addEventListener('change', handleTournamentModeChange);
+    }
+
+    // Highscore mode checkbox
+    const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
+    if (highscoreModeCheckbox) {
+        highscoreModeCheckbox.addEventListener('change', handleHighscoreModeChange);
+    }
+
+    // Highscore display click - starts highscore mode directly
+    const highscoreDisplay = document.getElementById('highscore-display');
+    if (highscoreDisplay) {
+        highscoreDisplay.addEventListener('click', handleHighscoreDisplayClick);
     }
 
     // Tooltip triggers - prevent click from bubbling to parent label
@@ -284,6 +305,9 @@ function bindMultiplayerEvents() {
  * Handle Play Again button
  */
 async function handlePlayAgain() {
+    // Clear any new highscore message from previous round
+    ui.clearNewHighscoreMessage();
+
     if (isMultiplayerMode()) {
         if (isHostRole) {
             // Host requests rematch
@@ -292,6 +316,22 @@ async function handlePlayAgain() {
             // Guest requests rematch
             guestController.requestRematch();
         }
+    } else if (state.isHighscoreMode()) {
+        // Highscore mode logic
+        const currentState = state.getState();
+        const challengeResult = currentState.challengeResult;
+        const playerWon = challengeResult && challengeResult.winner === currentState.players[0].name;
+
+        if (playerWon) {
+            // Player won - increment streak and continue
+            state.incrementStreak();
+        } else {
+            // Bot won - reset streak for a fresh attempt
+            state.resetStreak();
+        }
+
+        // Start next round
+        await state.playAgain();
     } else {
         // Local game - just restart (async for tournament mode tag generation)
         await state.playAgain();
@@ -302,6 +342,9 @@ async function handlePlayAgain() {
  * Handle New Game button
  */
 function handleNewGame() {
+    // Clear any new highscore message
+    ui.clearNewHighscoreMessage();
+
     if (isMultiplayerMode()) {
         if (isHostRole) {
             // Host ends session
@@ -312,6 +355,18 @@ function handleNewGame() {
             webrtc.disconnect();
         }
     }
+
+    // If in highscore mode, check if we need to save the highscore before exiting
+    if (state.isHighscoreMode()) {
+        const streak = state.getCurrentStreak();
+        const savedHighscore = parseInt(localStorage.getItem(STORAGE_KEYS.HIGHSCORE) || '0', 10);
+        if (streak > savedHighscore) {
+            localStorage.setItem(STORAGE_KEYS.HIGHSCORE, streak.toString());
+        }
+        // Reset highscore mode UI
+        resetHighscoreModeUI();
+    }
+
     resetMultiplayerState();
     state.resetSessionWins();
     state.resetToSetup();
@@ -329,9 +384,58 @@ function handleBackToSetup() {
             webrtc.disconnect();
         }
     }
+
+    // If in highscore mode, check if we need to save the highscore before exiting
+    if (state.isHighscoreMode()) {
+        const streak = state.getCurrentStreak();
+        const savedHighscore = parseInt(localStorage.getItem(STORAGE_KEYS.HIGHSCORE) || '0', 10);
+        if (streak > savedHighscore) {
+            localStorage.setItem(STORAGE_KEYS.HIGHSCORE, streak.toString());
+        }
+        // Reset highscore mode UI
+        resetHighscoreModeUI();
+    }
+
     resetMultiplayerState();
     state.resetSessionWins();
     state.resetToSetup();
+}
+
+/**
+ * Reset highscore mode UI elements to their default state
+ */
+function resetHighscoreModeUI() {
+    const elements = ui.getElements();
+    const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
+    const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
+
+    // Uncheck and re-enable controls
+    if (highscoreModeCheckbox) {
+        highscoreModeCheckbox.checked = false;
+    }
+    if (tournamentCheckbox) {
+        tournamentCheckbox.disabled = false;
+    }
+    if (elements.regionSelect) {
+        elements.regionSelect.disabled = false;
+    }
+    if (elements.addPlayerBtn) {
+        elements.addPlayerBtn.classList.remove('hidden');
+    }
+
+    // Show multiplayer section
+    const multiplayerCard = document.querySelector('.multiplayer-card');
+    if (multiplayerCard) {
+        multiplayerCard.classList.remove('hidden');
+    }
+
+    // Reset start button text
+    if (elements.startGameBtn) {
+        elements.startGameBtn.textContent = 'Start Local Game';
+    }
+
+    // Update highscore display
+    updateHighscoreDisplay();
 }
 
 /**
@@ -753,6 +857,9 @@ function renderGameScreen(currentState) {
             ? hostController.getSessionWins()
             : guestController.getSessionWins();
         ui.updateSessionScore(sessionWins, currentState.players, true);
+    } else if (state.isHighscoreMode()) {
+        // Highscore mode - show streak instead of session score
+        ui.updateStreakDisplay(state.getCurrentStreak(), true);
     } else {
         // Local game - show session score with local wins (pass array directly)
         const localWins = state.getSessionWins();
@@ -779,11 +886,39 @@ function renderResultsScreen(currentState) {
             ? hostController.getSessionWins()
             : guestController.getSessionWins();
         ui.updateSessionScore(sessionWins, currentState.players, true);
+    } else if (state.isHighscoreMode()) {
+        // Highscore mode results
+        ui.resetRematchUI();
+        const currentStreak = state.getCurrentStreak();
+
+        // Determine if player won (player is index 0, bot is index 1)
+        const challengeResult = currentState.challengeResult;
+        const playerWon = challengeResult && challengeResult.winner === currentState.players[0].name;
+
+        if (playerWon) {
+            // Player won - show streak as current + 1 (will be incremented when they click Next Round)
+            const displayStreak = currentStreak + 1;
+            ui.updateStreakDisplay(displayStreak, true);
+            ui.setPlayAgainButtonText('Next Round');
+        } else {
+            // Bot won - game over, show final streak and check for new highscore
+            ui.updateStreakDisplay(currentStreak, true);
+            ui.setPlayAgainButtonText('Try Again');
+
+            const savedHighscore = parseInt(localStorage.getItem(STORAGE_KEYS.HIGHSCORE) || '0', 10);
+            if (currentStreak > savedHighscore) {
+                // New highscore!
+                localStorage.setItem(STORAGE_KEYS.HIGHSCORE, currentStreak.toString());
+                ui.showNewHighscoreMessage(currentStreak);
+            }
+        }
     } else {
         ui.resetRematchUI();
         // Local game - show session score with local wins (pass array directly)
         const localWins = state.getSessionWins();
         ui.updateSessionScore(localWins, currentState.players, true);
+        // Reset button text for normal mode
+        ui.setPlayAgainButtonText('Play Again');
     }
 }
 
@@ -867,6 +1002,117 @@ function handleTournamentModeChange(e) {
     if (isMultiplayerMode() && isHostRole) {
         hostController.broadcastState();
     }
+}
+
+/**
+ * Handle highscore mode checkbox change
+ * Enforces constraints: tournament mode ON, region global, 1 player + 1 bot
+ */
+function handleHighscoreModeChange(e) {
+    const enabled = e.target.checked;
+    state.setHighscoreMode(enabled);
+    localStorage.setItem(STORAGE_KEYS.HIGHSCORE_MODE, enabled.toString());
+
+    const elements = ui.getElements();
+    const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
+    const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
+
+    if (enabled) {
+        // Force tournament mode ON
+        if (tournamentCheckbox && !tournamentCheckbox.checked) {
+            tournamentCheckbox.checked = true;
+            state.setTournamentMode(true);
+            localStorage.setItem(STORAGE_KEYS.TOURNAMENT_MODE, 'true');
+        }
+        tournamentCheckbox.disabled = true;
+
+        // Force region to Global
+        elements.regionSelect.value = '';
+        elements.regionSelect.disabled = true;
+        state.setRegion(null);
+        ui.updateCustomRegionVisibility();
+
+        // Configure players: 1 human + 1 bot
+        // Reset to exactly 2 players
+        const currentState = state.getState();
+        while (currentState.players.length > 2) {
+            state.removePlayer(currentState.players.length - 1);
+        }
+        // Set player 1 as human, player 2 as bot
+        state.setPlayerAsBot(0, false);
+        state.setPlayerAsBot(1, true);
+        state.updatePlayerName(0, 'Player 1');
+
+        // Hide add player button
+        elements.addPlayerBtn.classList.add('hidden');
+
+        // Hide multiplayer section
+        const multiplayerCard = document.querySelector('.multiplayer-card');
+        if (multiplayerCard) {
+            multiplayerCard.classList.add('hidden');
+        }
+
+        // Update start button text
+        elements.startGameBtn.textContent = 'Start Highscore Challenge';
+
+        // Show highscore display
+        updateHighscoreDisplay();
+    } else {
+        // Re-enable controls
+        tournamentCheckbox.disabled = false;
+        elements.regionSelect.disabled = false;
+        elements.addPlayerBtn.classList.remove('hidden');
+
+        // Show multiplayer section
+        const multiplayerCard = document.querySelector('.multiplayer-card');
+        if (multiplayerCard) {
+            multiplayerCard.classList.remove('hidden');
+        }
+
+        // Reset start button text
+        elements.startGameBtn.textContent = 'Start Local Game';
+
+        // Hide highscore display (only show when highscore mode is on or there's a saved highscore)
+        const savedHighscore = parseInt(localStorage.getItem(STORAGE_KEYS.HIGHSCORE) || '0', 10);
+        if (savedHighscore === 0) {
+            const highscoreDisplay = document.getElementById('highscore-display');
+            if (highscoreDisplay) {
+                highscoreDisplay.classList.add('hidden');
+            }
+        }
+    }
+}
+
+/**
+ * Update the highscore display on the welcome card
+ */
+function updateHighscoreDisplay() {
+    const savedHighscore = parseInt(localStorage.getItem(STORAGE_KEYS.HIGHSCORE) || '0', 10);
+    const highscoreDisplay = document.getElementById('highscore-display');
+    const highscoreValue = document.getElementById('highscore-value');
+
+    if (highscoreDisplay && highscoreValue) {
+        highscoreValue.textContent = savedHighscore;
+        // Show if there's a highscore or if highscore mode is enabled
+        const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
+        const shouldShow = savedHighscore > 0 || (highscoreModeCheckbox && highscoreModeCheckbox.checked);
+        highscoreDisplay.classList.toggle('hidden', !shouldShow);
+    }
+}
+
+/**
+ * Handle click on highscore display - enables highscore mode and starts game immediately
+ */
+async function handleHighscoreDisplayClick() {
+    // Enable highscore mode by simulating checkbox change
+    const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
+    if (highscoreModeCheckbox && !highscoreModeCheckbox.checked) {
+        highscoreModeCheckbox.checked = true;
+        handleHighscoreModeChange({ target: highscoreModeCheckbox });
+    }
+
+    // Start the game
+    await handleStartGame();
 }
 
 /**
