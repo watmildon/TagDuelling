@@ -1015,7 +1015,6 @@ function handleHighscoreModeChange(e) {
 
     const elements = ui.getElements();
     const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
-    const highscoreModeCheckbox = document.getElementById('highscore-mode-checkbox');
 
     if (enabled) {
         // Force tournament mode ON
