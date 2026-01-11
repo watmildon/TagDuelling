@@ -720,6 +720,18 @@ body[data-theme="dark"] .theme-icon::before {
     border: 1px solid var(--border-color);
 }
 
+.session-score span {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.session-score .score-player {
+    white-space: nowrap;
+}
+
 .session-score .score-label {
     color: var(--text-secondary);
     margin-right: 0.5rem;
@@ -731,11 +743,7 @@ body[data-theme="dark"] .theme-icon::before {
 
 .session-score .score-value {
     font-weight: 600;
-    margin: 0 0.5rem;
-}
-
-.session-score .score-separator {
-    color: var(--text-secondary);
+    margin: 0 0.25rem;
 }
 
 /* Results Screen */
@@ -787,6 +795,10 @@ body[data-theme="dark"] .theme-icon::before {
     font-size: 0.875rem;
     color: var(--text-secondary);
     font-style: italic;
+}
+
+.timeout-note.hidden {
+    display: none;
 }
 
 .timeout-note a {

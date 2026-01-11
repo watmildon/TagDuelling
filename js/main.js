@@ -754,10 +754,9 @@ function renderGameScreen(currentState) {
             : guestController.getSessionWins();
         ui.updateSessionScore(sessionWins, currentState.players, true);
     } else {
-        // Local game - show session score with local wins
+        // Local game - show session score with local wins (pass array directly)
         const localWins = state.getSessionWins();
-        const sessionWins = { host: localWins[0], guest: localWins[1] };
-        ui.updateSessionScore(sessionWins, currentState.players, true);
+        ui.updateSessionScore(localWins, currentState.players, true);
     }
 }
 
@@ -782,10 +781,9 @@ function renderResultsScreen(currentState) {
         ui.updateSessionScore(sessionWins, currentState.players, true);
     } else {
         ui.resetRematchUI();
-        // Local game - show session score with local wins
+        // Local game - show session score with local wins (pass array directly)
         const localWins = state.getSessionWins();
-        const sessionWins = { host: localWins[0], guest: localWins[1] };
-        ui.updateSessionScore(sessionWins, currentState.players, true);
+        ui.updateSessionScore(localWins, currentState.players, true);
     }
 }
 

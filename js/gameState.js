@@ -416,6 +416,10 @@ export function hasAnyBot() {
  * @param {number} playerIndex - Index of the winning player
  */
 export function recordWin(playerIndex) {
+    // Ensure sessionWins array matches player count
+    while (state.sessionWins.length < state.players.length) {
+        state.sessionWins.push(0);
+    }
     if (playerIndex >= 0 && playerIndex < state.sessionWins.length) {
         state.sessionWins[playerIndex]++;
     }
@@ -426,6 +430,10 @@ export function recordWin(playerIndex) {
  * @returns {Array} Win counts per player index
  */
 export function getSessionWins() {
+    // Ensure array matches player count
+    while (state.sessionWins.length < state.players.length) {
+        state.sessionWins.push(0);
+    }
     return [...state.sessionWins];
 }
 
@@ -433,7 +441,7 @@ export function getSessionWins() {
  * Reset session wins (when returning to setup)
  */
 export function resetSessionWins() {
-    state.sessionWins = [0, 0];
+    state.sessionWins = state.players.map(() => 0);
     state.roundNumber = 0;
 }
 
