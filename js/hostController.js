@@ -132,12 +132,12 @@ export function handleChallengeResult() {
 /**
  * Handle host's local rematch request
  */
-export function handleLocalRematchRequest() {
+export async function handleLocalRematchRequest() {
     rematchRequested.host = true;
 
     if (rematchRequested.guest) {
         // Both requested - start new round
-        startNewRound();
+        await startNewRound();
     } else {
         // Just update status and broadcast
         broadcastState();
@@ -288,12 +288,12 @@ function handleGuestChallenge() {
     }
 }
 
-function handleGuestRematchRequest() {
+async function handleGuestRematchRequest() {
     rematchRequested.guest = true;
 
     if (rematchRequested.host) {
         // Both requested - start new round
-        startNewRound();
+        await startNewRound();
     } else {
         broadcastState();
         if (onRematchStatusChanged) {
@@ -302,22 +302,11 @@ function handleGuestRematchRequest() {
     }
 }
 
-function startNewRound() {
+async function startNewRound() {
     rematchRequested = { host: false, guest: false };
 
-    // Get current round number and alternate starting player
-    const currentState = state.getState();
-    const currentRound = currentState.roundNumber || 1;
-    const nextRound = currentRound + 1;
-    const nextStartingPlayer = (nextRound - 1) % 2;
-
-    state.playAgain();
-
-    // Set the starting player for the new round
-    // Note: playAgain() resets to player 0, so we may need to adjust
-    if (nextStartingPlayer === 1) {
-        state.nextTurn(); // Move to player 1
-    }
+    // playAgain() handles round number increment and starting player cycling
+    await state.playAgain();
 
     broadcastState();
 

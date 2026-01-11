@@ -76,6 +76,7 @@ export function createStateSync(gameState, version, rematchRequested = { host: f
             gamePhase: gameState.gamePhase,
             challenger: gameState.challenger,
             challengeResult: gameState.challengeResult,
+            tournamentMode: gameState.tournamentMode,
             rematchRequested: rematchRequested,
             sessionWins: sessionWins
         }

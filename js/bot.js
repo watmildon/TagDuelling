@@ -56,6 +56,61 @@ const KEY_FREQUENCY_RANK = {
     'cuisine': 16, 'religion': 17, 'historic': 18, 'place': 19, 'man_made': 20
 };
 
+// Static list of interesting starting tags for tournament mode
+// These are moderately common values of common keys - good conversation starters
+const TOURNAMENT_STARTING_TAGS = [
+    { key: 'amenity', value: 'cafe' },
+    { key: 'amenity', value: 'restaurant' },
+    { key: 'amenity', value: 'pub' },
+    { key: 'amenity', value: 'pharmacy' },
+    { key: 'amenity', value: 'library' },
+    { key: 'amenity', value: 'hospital' },
+    { key: 'amenity', value: 'school' },
+    { key: 'amenity', value: 'bank' },
+    { key: 'amenity', value: 'post_office' },
+    { key: 'amenity', value: 'cinema' },
+    { key: 'leisure', value: 'park' },
+    { key: 'leisure', value: 'playground' },
+    { key: 'leisure', value: 'swimming_pool' },
+    { key: 'leisure', value: 'sports_centre' },
+    { key: 'leisure', value: 'golf_course' },
+    { key: 'building', value: 'church' },
+    { key: 'building', value: 'school' },
+    { key: 'building', value: 'hospital' },
+    { key: 'building', value: 'hotel' },
+    { key: 'building', value: 'warehouse' },
+    { key: 'natural', value: 'peak' },
+    { key: 'natural', value: 'beach' },
+    { key: 'natural', value: 'cliff' },
+    { key: 'natural', value: 'cave_entrance' },
+    { key: 'natural', value: 'volcano' },
+    { key: 'shop', value: 'bakery' },
+    { key: 'shop', value: 'butcher' },
+    { key: 'shop', value: 'florist' },
+    { key: 'shop', value: 'bookshop' },
+    { key: 'shop', value: 'jewelry' },
+    { key: 'tourism', value: 'museum' },
+    { key: 'tourism', value: 'hotel' },
+    { key: 'tourism', value: 'viewpoint' },
+    { key: 'tourism', value: 'zoo' },
+    { key: 'tourism', value: 'theme_park' },
+    { key: 'historic', value: 'castle' },
+    { key: 'historic', value: 'monument' },
+    { key: 'historic', value: 'ruins' },
+    { key: 'historic', value: 'memorial' },
+    { key: 'historic', value: 'archaeological_site' },
+    { key: 'sport', value: 'tennis' },
+    { key: 'sport', value: 'soccer' },
+    { key: 'sport', value: 'basketball' },
+    { key: 'sport', value: 'swimming' },
+    { key: 'sport', value: 'golf' },
+    { key: 'cuisine', value: 'pizza' },
+    { key: 'cuisine', value: 'sushi' },
+    { key: 'cuisine', value: 'indian' },
+    { key: 'cuisine', value: 'mexican' },
+    { key: 'cuisine', value: 'thai' }
+];
+
 // ============================================
 // TagInfo API Functions
 // ============================================
@@ -456,6 +511,48 @@ async function evaluateChallengeDecision(existingTags) {
         console.warn('Bot: Challenge evaluation failed:', error);
         // On API error, don't challenge (play safe)
         return false;
+    }
+}
+
+// ============================================
+// Tournament Mode
+// ============================================
+
+/**
+ * Generate a random interesting starting tag for tournament mode
+ * Uses TagInfo API to get moderately common values, falls back to static list
+ * @returns {Promise<{key: string, value: string}>}
+ */
+export async function generateTournamentStartTag() {
+    try {
+        // Pick a random common key
+        const keyIndex = Math.floor(Math.random() * COMMON_KEYS.length);
+        const key = COMMON_KEYS[keyIndex];
+
+        console.log(`Tournament: Fetching values for key "${key}"...`);
+        const values = await fetchKeyValues(key);
+
+        if (values.length >= 5) {
+            // Pick a moderately common value (ranks 3-10) for variety
+            // Not the most common (boring) but not too rare (might not exist)
+            const startIndex = Math.min(2, values.length - 1);
+            const endIndex = Math.min(10, values.length);
+            const pool = values.slice(startIndex, endIndex);
+            const chosen = pool[Math.floor(Math.random() * pool.length)];
+            console.log(`Tournament: Selected "${key}=${chosen.value}" from TagInfo`);
+            return { key, value: chosen.value };
+        }
+
+        // Not enough values, use fallback
+        throw new Error('Not enough values from API');
+
+    } catch (error) {
+        console.warn('Tournament: API failed, using static list:', error.message);
+        // Fall back to static list
+        const index = Math.floor(Math.random() * TOURNAMENT_STARTING_TAGS.length);
+        const tag = TOURNAMENT_STARTING_TAGS[index];
+        console.log(`Tournament: Selected "${tag.key}=${tag.value}" from static list`);
+        return { ...tag };
     }
 }
 

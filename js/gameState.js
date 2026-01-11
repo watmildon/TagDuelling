@@ -4,6 +4,7 @@
  */
 
 import { prefetchTagCount } from './overpass.js';
+import { generateTournamentStartTag } from './bot.js';
 
 // DWG (Data Working Group) member IRC usernames for bot names
 const DWG_USERNAMES = [
@@ -44,7 +45,10 @@ function createInitialState() {
         region: null, // { name, adminLevel, displayName } or { relationId, displayName } or null for global
         gamePhase: PHASES.SETUP,
         challenger: null, // Player who initiated challenge
-        challengeResult: null // { count: number, winner: string, loser: string }
+        challengeResult: null, // { count: number, winner: string, loser: string }
+        tournamentMode: false, // Whether to start each round with a random tag
+        sessionWins: [0, 0], // Win counts per player index for local games
+        roundNumber: 0 // Current round number (0 = not started, 1 = first round, etc.)
     };
 }
 
@@ -251,13 +255,30 @@ export function enterWaitingState() {
 
 /**
  * Start the game
+ * If tournament mode is enabled, generates a random starting tag
+ * @returns {Promise<void>}
  */
-export function startGame() {
+export async function startGame() {
     state.gamePhase = PHASES.PLAYING;
-    state.currentPlayerIndex = 0;
+    state.roundNumber = 1;
+    state.currentPlayerIndex = 0; // First round always starts with player 0
     state.tags = [];
     state.challenger = null;
     state.challengeResult = null;
+
+    // Generate starting tag for tournament mode
+    if (state.tournamentMode) {
+        try {
+            const startingTag = await generateTournamentStartTag();
+            state.tags = [startingTag];
+            // Prefetch tag count for query optimization
+            prefetchTagCount(startingTag.key, startingTag.value);
+        } catch (error) {
+            console.warn('Failed to generate tournament starting tag:', error);
+            // Continue without starting tag if generation fails
+        }
+    }
+
     notifySubscribers();
 }
 
@@ -303,13 +324,30 @@ export function setChallengeResult(count) {
 
 /**
  * Reset for a new round (same players, same region)
+ * If tournament mode is enabled, generates a new random starting tag
+ * Cycles starting player through all players each round
+ * @returns {Promise<void>}
  */
-export function playAgain() {
+export async function playAgain() {
     state.tags = [];
-    state.currentPlayerIndex = 0;
+    state.roundNumber = (state.roundNumber || 0) + 1;
+    // Cycle starting player: round 1 -> player 0, round 2 -> player 1, etc.
+    state.currentPlayerIndex = (state.roundNumber - 1) % state.players.length;
     state.gamePhase = PHASES.PLAYING;
     state.challenger = null;
     state.challengeResult = null;
+
+    // Generate new starting tag for tournament mode rematches
+    if (state.tournamentMode) {
+        try {
+            const startingTag = await generateTournamentStartTag();
+            state.tags = [startingTag];
+            prefetchTagCount(startingTag.key, startingTag.value);
+        } catch (error) {
+            console.warn('Failed to generate tournament starting tag:', error);
+        }
+    }
+
     notifySubscribers();
 }
 
@@ -374,11 +412,62 @@ export function hasAnyBot() {
 }
 
 /**
+ * Record a win for a player (local games)
+ * @param {number} playerIndex - Index of the winning player
+ */
+export function recordWin(playerIndex) {
+    // Ensure sessionWins array matches player count
+    while (state.sessionWins.length < state.players.length) {
+        state.sessionWins.push(0);
+    }
+    if (playerIndex >= 0 && playerIndex < state.sessionWins.length) {
+        state.sessionWins[playerIndex]++;
+    }
+}
+
+/**
+ * Get session wins for local games
+ * @returns {Array} Win counts per player index
+ */
+export function getSessionWins() {
+    // Ensure array matches player count
+    while (state.sessionWins.length < state.players.length) {
+        state.sessionWins.push(0);
+    }
+    return [...state.sessionWins];
+}
+
+/**
+ * Reset session wins (when returning to setup)
+ */
+export function resetSessionWins() {
+    state.sessionWins = state.players.map(() => 0);
+    state.roundNumber = 0;
+}
+
+/**
  * Check if a non-global region is selected
  * @returns {boolean}
  */
 export function hasRegionSelected() {
     return state.region !== null;
+}
+
+/**
+ * Set tournament mode
+ * @param {boolean} enabled - Whether tournament mode is enabled
+ */
+export function setTournamentMode(enabled) {
+    state.tournamentMode = enabled;
+    notifySubscribers();
+}
+
+/**
+ * Check if tournament mode is enabled
+ * @returns {boolean}
+ */
+export function isTournamentMode() {
+    return state.tournamentMode === true;
 }
 
 /**
@@ -400,7 +489,8 @@ export function replaceState(newState) {
         region: newState.region,
         gamePhase: newState.gamePhase || state.gamePhase,
         challenger: newState.challenger || null,
-        challengeResult: newState.challengeResult || null
+        challengeResult: newState.challengeResult || null,
+        tournamentMode: newState.tournamentMode || false
     };
     notifySubscribers();
 }
@@ -424,7 +514,8 @@ export function replaceStateSilent(newState) {
         region: newState.region,
         gamePhase: newState.gamePhase || state.gamePhase,
         challenger: newState.challenger || null,
-        challengeResult: newState.challengeResult || null
+        challengeResult: newState.challengeResult || null,
+        tournamentMode: newState.tournamentMode || false
     };
     // No notifySubscribers() call - caller must call notifyStateChange()
 }

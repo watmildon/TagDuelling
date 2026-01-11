@@ -55,51 +55,66 @@
             </div>
 
             <div class="card">
-                <h2>Region</h2>
+                <h2>Game Setup</h2>
                 <div id="region-warning" class="info-message hidden">
                     Bots use global TagInfo data for decisions, so region selection is disabled when playing with bots.
                 </div>
-                <select id="region-select">
-                    <option value="">Global (entire OSM database)</option>
-                    <option value="custom">Custom (enter relation ID below)</option>
-                    <optgroup label="Countries">
-                        <option data-name="United Kingdom" data-admin-level="2">United Kingdom</option>
-                        <option data-name="Italia" data-admin-level="2">Italy</option>
-                        <option data-name="Deutschland" data-admin-level="2">Germany</option>
-                        <option data-name="France" data-admin-level="2">France</option>
-                        <option data-name="España" data-admin-level="2">Spain</option>
-                        <option data-name="日本" data-admin-level="2">Japan</option>
-                        <option data-name="Australia" data-admin-level="2">Australia</option>
-                    </optgroup>
-                    <optgroup label="States/Regions">
-                        <option data-name="California" data-admin-level="4">California, USA</option>
-                        <option data-name="Texas" data-admin-level="4">Texas, USA</option>
-                        <option data-name="New York" data-admin-level="4">New York State, USA</option>
-                        <option data-name="Bayern" data-admin-level="4">Bavaria, Germany</option>
-                        <option data-name="Île-de-France" data-admin-level="4">Île-de-France, France</option>
-                    </optgroup>
-                    <optgroup label="Cities">
-                        <option data-name="London" data-admin-level="6">London, UK</option>
-                        <option data-name="Paris" data-admin-level="8">Paris, France</option>
-                        <option data-name="Berlin" data-admin-level="4">Berlin, Germany</option>
-                        <option data-name="New York City" data-admin-level="5">New York City, USA</option>
-                        <option data-name="Los Angeles" data-admin-level="6">Los Angeles, USA</option>
-                        <option data-name="Phoenix" data-admin-level="8">Phoenix, USA</option>
-                        <option data-name="東京都" data-admin-level="4">Tokyo, Japan</option>
-                        <option data-name="Sydney" data-admin-level="6">Sydney, Australia</option>
-                    </optgroup>
-                </select>
-                <div id="custom-region-input" class="custom-region-input hidden">
-                    <label for="relation-id-input">OSM Relation ID:</label>
-                    <input type="text" id="relation-id-input" placeholder="e.g., 5750005">
-                    <small>Find relation IDs on <a href="https://www.openstreetmap.org" target="_blank">openstreetmap.org</a></small>
+
+                <div class="setup-option">
+                    <label class="setup-label">Region</label>
+                    <select id="region-select">
+                        <option value="">Global (entire OSM database)</option>
+                        <option value="custom">Custom (enter relation ID below)</option>
+                        <optgroup label="Countries">
+                            <option data-name="United Kingdom" data-admin-level="2">United Kingdom</option>
+                            <option data-name="Italia" data-admin-level="2">Italy</option>
+                            <option data-name="Deutschland" data-admin-level="2">Germany</option>
+                            <option data-name="France" data-admin-level="2">France</option>
+                            <option data-name="España" data-admin-level="2">Spain</option>
+                            <option data-name="日本" data-admin-level="2">Japan</option>
+                            <option data-name="Australia" data-admin-level="2">Australia</option>
+                        </optgroup>
+                        <optgroup label="States/Regions">
+                            <option data-name="California" data-admin-level="4">California, USA</option>
+                            <option data-name="Texas" data-admin-level="4">Texas, USA</option>
+                            <option data-name="New York" data-admin-level="4">New York State, USA</option>
+                            <option data-name="Bayern" data-admin-level="4">Bavaria, Germany</option>
+                            <option data-name="Île-de-France" data-admin-level="4">Île-de-France, France</option>
+                        </optgroup>
+                        <optgroup label="Cities">
+                            <option data-name="London" data-admin-level="6">London, UK</option>
+                            <option data-name="Paris" data-admin-level="8">Paris, France</option>
+                            <option data-name="Berlin" data-admin-level="4">Berlin, Germany</option>
+                            <option data-name="New York City" data-admin-level="5">New York City, USA</option>
+                            <option data-name="Los Angeles" data-admin-level="6">Los Angeles, USA</option>
+                            <option data-name="Phoenix" data-admin-level="8">Phoenix, USA</option>
+                            <option data-name="東京都" data-admin-level="4">Tokyo, Japan</option>
+                            <option data-name="Sydney" data-admin-level="6">Sydney, Australia</option>
+                        </optgroup>
+                    </select>
+                    <div id="custom-region-input" class="custom-region-input hidden">
+                        <label for="relation-id-input">OSM Relation ID:</label>
+                        <input type="text" id="relation-id-input" placeholder="e.g., 5750005">
+                        <small>Find relation IDs on <a href="https://www.openstreetmap.org" target="_blank">openstreetmap.org</a></small>
+                    </div>
+                </div>
+
+                <div class="setup-option">
+                    <label class="checkbox-option">
+                        <input type="checkbox" id="tournament-mode-checkbox">
+                        <span class="checkbox-label">Tournament Mode</span>
+                        <span class="tooltip-trigger" tabindex="0" role="button" aria-label="More info">
+                            <span class="info-icon">?</span>
+                            <span class="tooltip-content">Start each round with a random tag. Reduces first-player advantage and exposes you to new tags!</span>
+                        </span>
+                    </label>
                 </div>
             </div>
 
             <button id="start-game-btn" class="btn btn-primary btn-large">Start Local Game</button>
 
             <div class="card multiplayer-card">
-                <h2>Online Multiplayer (experimental)</h2>
+                <h2>Online Multiplayer</h2>
                 <p class="multiplayer-intro">Play with a friend over the internet. No account needed - just share a room code!</p>
 
                 <div id="multiplayer-default" class="multiplayer-section">
@@ -162,6 +177,11 @@
                     <div id="guest-region-value" class="region-value">Global</div>
                 </div>
 
+                <div id="guest-tournament-mode" class="guest-tournament-mode hidden">
+                    <span class="tournament-badge">Tournament Mode</span>
+                    <span class="tournament-hint">Starting with a random tag</span>
+                </div>
+
                 <div class="waiting-animation">
                     <div class="loading-spinner"></div>
                 </div>
@@ -212,6 +232,10 @@
 
                 <div class="result-details">
                     <p><strong>Objects found:</strong> <span id="result-count"></span></p>
+                    <p id="timeout-note" class="timeout-note hidden">
+                        Query timed out? We'd love to hear about the tags that caused it!
+                        <a href="https://github.com/watmildon/TagDuelling/issues/14" target="_blank" rel="noopener noreferrer">Report it here</a>
+                    </p>
                     <a id="overpass-link" href="#" target="_blank" class="btn btn-secondary">View on Ultra</a>
                 </div>
 

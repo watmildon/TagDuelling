@@ -228,7 +228,8 @@ function applyReceivedState(receivedState) {
         region: receivedState.region,
         gamePhase: guestPhase,
         challenger: receivedState.challenger,
-        challengeResult: receivedState.challengeResult
+        challengeResult: receivedState.challengeResult,
+        tournamentMode: receivedState.tournamentMode
     });
 }
 

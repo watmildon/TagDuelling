@@ -44,6 +44,7 @@ export function initElements() {
         resultTitle: document.getElementById('result-title'),
         resultMessage: document.getElementById('result-message'),
         resultCount: document.getElementById('result-count'),
+        timeoutNote: document.getElementById('timeout-note'),
         overpassLink: document.getElementById('overpass-link'),
         finalTagList: document.getElementById('final-tag-list'),
         playAgainBtn: document.getElementById('play-again-btn'),
@@ -396,6 +397,11 @@ export function clearEditableInputs() {
  * @param {string} ultraLink - Link to Ultra
  */
 export function renderResults(result, tags, ultraLink) {
+    // Reset timeout note state first (in case previous game timed out)
+    if (elements.timeoutNote) {
+        elements.timeoutNote.classList.add('hidden');
+    }
+
     // Set icon - always celebratory since we're announcing the winner
     elements.resultIcon.className = 'result-icon';
     elements.resultIcon.classList.add('winner');
@@ -410,6 +416,9 @@ export function renderResults(result, tags, ultraLink) {
     // Result count with formatting
     if (result.count === Infinity) {
         elements.resultCount.textContent = 'Many (query timed out)';
+        if (elements.timeoutNote) {
+            elements.timeoutNote.classList.remove('hidden');
+        }
     } else {
         elements.resultCount.textContent = result.count.toLocaleString();
     }
@@ -799,8 +808,19 @@ export function updateGuestRegionDisplay(region) {
 }
 
 /**
+ * Update the guest's waiting screen tournament mode display
+ * @param {boolean} enabled - Whether tournament mode is enabled
+ */
+export function updateGuestTournamentModeDisplay(enabled) {
+    const tournamentDisplay = document.getElementById('guest-tournament-mode');
+    if (tournamentDisplay) {
+        tournamentDisplay.classList.toggle('hidden', !enabled);
+    }
+}
+
+/**
  * Update session score display for multiplayer
- * @param {Object} wins - { host: number, guest: number }
+ * @param {Object|Array} wins - { host: number, guest: number } for multiplayer or [number, ...] array for local
  * @param {Array} players - Player array with names
  * @param {boolean} show - Whether to show the score display
  */
@@ -810,9 +830,24 @@ export function updateSessionScore(wins, players, show = true) {
     const resultsScore = document.getElementById('results-session-score');
     const resultsScoreText = document.getElementById('results-session-score-text');
 
-    const hostName = players[0]?.name || 'Host';
-    const guestName = players[1]?.name || 'Player 2';
-    const scoreHtml = `<span class="score-name">${hostName}</span> <span class="score-value">${wins.host}</span> <span class="score-separator">-</span> <span class="score-value">${wins.guest}</span> <span class="score-name">${guestName}</span>`;
+    let scoreHtml;
+
+    // Handle both array (local) and object (multiplayer) formats
+    // Wrap each player in a .score-player span so name+score stay together when wrapping
+    if (Array.isArray(wins)) {
+        // Local game with variable number of players
+        const scoreParts = players.map((player, index) => {
+            const name = player?.name || `Player ${index + 1}`;
+            const score = wins[index] ?? 0;
+            return `<span class="score-player"><span class="score-name">${name}</span> <span class="score-value">${score}</span></span>`;
+        });
+        scoreHtml = scoreParts.join('');
+    } else {
+        // Multiplayer (host/guest format)
+        const hostName = players[0]?.name || 'Host';
+        const guestName = players[1]?.name || 'Player 2';
+        scoreHtml = `<span class="score-player"><span class="score-name">${hostName}</span> <span class="score-value">${wins.host}</span></span><span class="score-player"><span class="score-value">${wins.guest}</span> <span class="score-name">${guestName}</span></span>`;
+    }
 
     if (gameScore && gameScoreText) {
         gameScoreText.innerHTML = scoreHtml;
