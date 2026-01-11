@@ -4,6 +4,7 @@
  */
 
 import { prefetchTagCount } from './overpass.js';
+import { generateTournamentStartTag } from './bot.js';
 
 // DWG (Data Working Group) member IRC usernames for bot names
 const DWG_USERNAMES = [
@@ -44,7 +45,8 @@ function createInitialState() {
         region: null, // { name, adminLevel, displayName } or { relationId, displayName } or null for global
         gamePhase: PHASES.SETUP,
         challenger: null, // Player who initiated challenge
-        challengeResult: null // { count: number, winner: string, loser: string }
+        challengeResult: null, // { count: number, winner: string, loser: string }
+        tournamentMode: false // Whether to start each round with a random tag
     };
 }
 
@@ -251,13 +253,29 @@ export function enterWaitingState() {
 
 /**
  * Start the game
+ * If tournament mode is enabled, generates a random starting tag
+ * @returns {Promise<void>}
  */
-export function startGame() {
+export async function startGame() {
     state.gamePhase = PHASES.PLAYING;
     state.currentPlayerIndex = 0;
     state.tags = [];
     state.challenger = null;
     state.challengeResult = null;
+
+    // Generate starting tag for tournament mode
+    if (state.tournamentMode) {
+        try {
+            const startingTag = await generateTournamentStartTag();
+            state.tags = [startingTag];
+            // Prefetch tag count for query optimization
+            prefetchTagCount(startingTag.key, startingTag.value);
+        } catch (error) {
+            console.warn('Failed to generate tournament starting tag:', error);
+            // Continue without starting tag if generation fails
+        }
+    }
+
     notifySubscribers();
 }
 
@@ -303,13 +321,27 @@ export function setChallengeResult(count) {
 
 /**
  * Reset for a new round (same players, same region)
+ * If tournament mode is enabled, generates a new random starting tag
+ * @returns {Promise<void>}
  */
-export function playAgain() {
+export async function playAgain() {
     state.tags = [];
     state.currentPlayerIndex = 0;
     state.gamePhase = PHASES.PLAYING;
     state.challenger = null;
     state.challengeResult = null;
+
+    // Generate new starting tag for tournament mode rematches
+    if (state.tournamentMode) {
+        try {
+            const startingTag = await generateTournamentStartTag();
+            state.tags = [startingTag];
+            prefetchTagCount(startingTag.key, startingTag.value);
+        } catch (error) {
+            console.warn('Failed to generate tournament starting tag:', error);
+        }
+    }
+
     notifySubscribers();
 }
 
@@ -382,6 +414,23 @@ export function hasRegionSelected() {
 }
 
 /**
+ * Set tournament mode
+ * @param {boolean} enabled - Whether tournament mode is enabled
+ */
+export function setTournamentMode(enabled) {
+    state.tournamentMode = enabled;
+    notifySubscribers();
+}
+
+/**
+ * Check if tournament mode is enabled
+ * @returns {boolean}
+ */
+export function isTournamentMode() {
+    return state.tournamentMode === true;
+}
+
+/**
  * Replace entire state (used by guest to apply host's authoritative state)
  * This is the primary method for state synchronization in multiplayer.
  * @param {Object} newState - Complete state object from host
@@ -400,7 +449,8 @@ export function replaceState(newState) {
         region: newState.region,
         gamePhase: newState.gamePhase || state.gamePhase,
         challenger: newState.challenger || null,
-        challengeResult: newState.challengeResult || null
+        challengeResult: newState.challengeResult || null,
+        tournamentMode: newState.tournamentMode || false
     };
     notifySubscribers();
 }
@@ -424,7 +474,8 @@ export function replaceStateSilent(newState) {
         region: newState.region,
         gamePhase: newState.gamePhase || state.gamePhase,
         challenger: newState.challenger || null,
-        challengeResult: newState.challengeResult || null
+        challengeResult: newState.challengeResult || null,
+        tournamentMode: newState.tournamentMode || false
     };
     // No notifySubscribers() call - caller must call notifyStateChange()
 }

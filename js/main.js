@@ -18,7 +18,8 @@ import * as guestController from './guestController.js';
 const STORAGE_KEYS = {
     REGION: 'tag-duelling-region',
     RELATION_ID: 'tag-duelling-relation-id',
-    THEME: 'tag-duelling-theme'
+    THEME: 'tag-duelling-theme',
+    TOURNAMENT_MODE: 'tag-duelling-tournament-mode'
 };
 
 // Multiplayer UI element references
@@ -173,6 +174,16 @@ function loadPreferences(elements) {
     // Sync loaded region to state
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
+
+    // Load tournament mode preference
+    const savedTournamentMode = localStorage.getItem(STORAGE_KEYS.TOURNAMENT_MODE);
+    if (savedTournamentMode === 'true') {
+        const checkbox = document.getElementById('tournament-mode-checkbox');
+        if (checkbox) {
+            checkbox.checked = true;
+            state.setTournamentMode(true);
+        }
+    }
 }
 
 /**
@@ -187,6 +198,20 @@ function bindEvents(elements) {
     elements.startGameBtn.addEventListener('click', handleStartGame);
     elements.regionSelect.addEventListener('change', handleRegionChange);
     elements.relationIdInput.addEventListener('input', handleRelationIdInput);
+
+    // Tournament mode checkbox
+    const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
+    if (tournamentCheckbox) {
+        tournamentCheckbox.addEventListener('change', handleTournamentModeChange);
+    }
+
+    // Tooltip triggers - prevent click from bubbling to parent label
+    document.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+        trigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
 
     // Game screen
     elements.submitBtn.addEventListener('click', handleSubmit);
@@ -258,7 +283,7 @@ function bindMultiplayerEvents() {
 /**
  * Handle Play Again button
  */
-function handlePlayAgain() {
+async function handlePlayAgain() {
     if (isMultiplayerMode()) {
         if (isHostRole) {
             // Host requests rematch
@@ -268,8 +293,8 @@ function handlePlayAgain() {
             guestController.requestRematch();
         }
     } else {
-        // Local game - just restart
-        state.playAgain();
+        // Local game - just restart (async for tournament mode tag generation)
+        await state.playAgain();
     }
 }
 
@@ -627,8 +652,9 @@ function renderFromState() {
         case state.PHASES.WAITING:
             // Guest waiting for host to start
             ui.showScreen('waiting');
-            // Update region display for guest
+            // Update region and tournament mode display for guest
             ui.updateGuestRegionDisplay(currentState.region);
+            ui.updateGuestTournamentModeDisplay(currentState.tournamentMode);
             break;
 
         case state.PHASES.PLAYING:
@@ -824,9 +850,23 @@ function handleRelationIdInput(e) {
 }
 
 /**
+ * Handle tournament mode checkbox change
+ */
+function handleTournamentModeChange(e) {
+    const enabled = e.target.checked;
+    state.setTournamentMode(enabled);
+    localStorage.setItem(STORAGE_KEYS.TOURNAMENT_MODE, enabled.toString());
+
+    // Broadcast tournament mode change to guest in multiplayer
+    if (isMultiplayerMode() && isHostRole) {
+        hostController.broadcastState();
+    }
+}
+
+/**
  * Handle start game button
  */
-function handleStartGame() {
+async function handleStartGame() {
     // Check for bots in multiplayer mode
     if (isMultiplayerMode() && state.hasAnyBot()) {
         ui.showError("Bots are not supported in multiplayer mode");
@@ -839,8 +879,8 @@ function handleStartGame() {
     // Clear bot's combination cache for fresh game
     bot.clearCombinationCache();
 
-    // Start the game
-    state.startGame();
+    // Start the game (async for tournament mode tag generation)
+    await state.startGame();
 
     // In multiplayer, host broadcasts the new state to guest
     if (isMultiplayerMode() && isHostRole) {
@@ -1031,7 +1071,7 @@ async function executeChallengeQuery(tags, region) {
         }
 
         // User declined retry or error is not retryable - go back to playing state
-        state.playAgain();
+        await state.playAgain();
 
         // Broadcast recovery state if host
         if (isMultiplayerMode() && isHostRole) {

@@ -1273,6 +1273,131 @@ body[data-theme="dark"] .theme-icon::before {
     50% { opacity: 0.5; }
 }
 
+/* Game Setup Options */
+.setup-option {
+    margin-bottom: 1.25rem;
+}
+
+.setup-option:last-child {
+    margin-bottom: 0;
+}
+
+.setup-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+/* Tournament Mode Checkbox */
+.checkbox-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    padding: 0.5rem 0;
+}
+
+.checkbox-option input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+.checkbox-label {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* Tooltip with hover + tap support */
+.tooltip-trigger {
+    position: relative;
+    display: inline-flex;
+    margin-left: auto;
+}
+
+.info-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    cursor: help;
+}
+
+.tooltip-trigger:hover .info-icon,
+.tooltip-trigger:focus .info-icon {
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.tooltip-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: 220px;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--text-primary);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+}
+
+/* Show on hover (desktop) and focus (keyboard/tap) */
+.tooltip-trigger:hover .tooltip-content,
+.tooltip-trigger:focus .tooltip-content {
+    display: block;
+}
+
+/* Prevent checkbox toggle when tapping tooltip */
+.tooltip-trigger {
+    pointer-events: auto;
+}
+
+.tooltip-trigger:focus {
+    outline: none;
+}
+
+/* Guest Tournament Mode Display */
+.guest-tournament-mode {
+    margin-bottom: 1.5rem;
+    text-align: center;
+    padding: 0.75rem;
+    background-color: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-tertiary));
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-primary);
+}
+
+.guest-tournament-mode.hidden {
+    display: none;
+}
+
+.tournament-badge {
+    display: inline-block;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.tournament-hint {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
     .container {

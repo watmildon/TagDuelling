@@ -799,6 +799,17 @@ export function updateGuestRegionDisplay(region) {
 }
 
 /**
+ * Update the guest's waiting screen tournament mode display
+ * @param {boolean} enabled - Whether tournament mode is enabled
+ */
+export function updateGuestTournamentModeDisplay(enabled) {
+    const tournamentDisplay = document.getElementById('guest-tournament-mode');
+    if (tournamentDisplay) {
+        tournamentDisplay.classList.toggle('hidden', !enabled);
+    }
+}
+
+/**
  * Update session score display for multiplayer
  * @param {Object} wins - { host: number, guest: number }
  * @param {Array} players - Player array with names
