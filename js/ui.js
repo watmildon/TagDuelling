@@ -578,8 +578,17 @@ export function setRelationIdInput(relationId) {
  * Update bot/region conflict state
  * @param {boolean} hasBots - Whether any player is a bot
  * @param {boolean} hasRegion - Whether a non-global region is selected
+ * @param {boolean} inMultiplayer - Whether in multiplayer mode (bots not allowed)
  */
-export function updateBotRegionConflictState(hasBots, hasRegion) {
+export function updateBotRegionConflictState(hasBots, hasRegion, inMultiplayer = false) {
+    // In multiplayer, bots are not allowed so hide all bot-related warnings
+    if (inMultiplayer) {
+        elements.regionSelect.disabled = false;
+        elements.regionWarning.classList.add('hidden');
+        elements.botWarning.classList.add('hidden');
+        return;
+    }
+
     // Region select: disable if bots are present
     elements.regionSelect.disabled = hasBots;
     elements.regionWarning.classList.toggle('hidden', !hasBots);
@@ -645,4 +654,142 @@ export function setGameControlsEnabled(isLocalTurn) {
 
     // Add visual indication when it's not the local player's turn
     elements.currentPlayerContainer.classList.toggle('waiting-for-opponent', !isLocalTurn);
+}
+
+/**
+ * Show pending action indicator (for guest submitting to host)
+ */
+export function showPendingAction() {
+    elements.submitBtn.disabled = true;
+    elements.submitBtn.textContent = 'Submitting...';
+    elements.challengeBtn.disabled = true;
+    const inputs = elements.tagPool.querySelectorAll('input');
+    inputs.forEach(input => input.disabled = true);
+}
+
+/**
+ * Hide pending action indicator (restore normal state)
+ */
+export function hidePendingAction() {
+    elements.submitBtn.disabled = false;
+    elements.submitBtn.textContent = 'Submit';
+    elements.challengeBtn.disabled = false;
+    const inputs = elements.tagPool.querySelectorAll('input');
+    inputs.forEach(input => input.disabled = false);
+}
+
+/**
+ * Show connection lost overlay
+ */
+export function showConnectionLost() {
+    const overlay = document.getElementById('connection-lost-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    } else {
+        // Fallback to alert if overlay doesn't exist
+        showError('Connection lost. Please start a new game to play again.');
+    }
+}
+
+/**
+ * Hide connection lost overlay
+ */
+export function hideConnectionLost() {
+    const overlay = document.getElementById('connection-lost-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
+
+/**
+ * Update results screen for multiplayer rematch flow
+ * @param {boolean} isHost - Whether local player is host
+ * @param {Object} rematchStatus - { host: boolean, guest: boolean }
+ */
+export function updateRematchUI(isHost, rematchStatus) {
+    const playAgainBtn = elements.playAgainBtn;
+    const newGameBtn = elements.newGameBtn;
+    const notification = document.getElementById('rematch-notification');
+
+    if (isHost) {
+        // Host sees different button text based on guest's request
+        if (rematchStatus.guest) {
+            playAgainBtn.textContent = 'Start Rematch';
+            playAgainBtn.disabled = false;
+            if (notification) {
+                notification.textContent = 'Your opponent wants a rematch!';
+                notification.classList.remove('hidden');
+            }
+        } else if (rematchStatus.host) {
+            playAgainBtn.textContent = 'Waiting for opponent...';
+            playAgainBtn.disabled = true;
+            if (notification) {
+                notification.classList.add('hidden');
+            }
+        } else {
+            playAgainBtn.textContent = 'Play Again';
+            playAgainBtn.disabled = false;
+            if (notification) {
+                notification.classList.add('hidden');
+            }
+        }
+        newGameBtn.textContent = 'End Session';
+    } else {
+        // Guest sees different button text based on host's request
+        if (rematchStatus.host) {
+            playAgainBtn.textContent = 'Accept Rematch';
+            playAgainBtn.disabled = false;
+            if (notification) {
+                notification.textContent = 'Host wants a rematch!';
+                notification.classList.remove('hidden');
+            }
+        } else if (rematchStatus.guest) {
+            playAgainBtn.textContent = 'Waiting for host...';
+            playAgainBtn.disabled = true;
+            if (notification) {
+                notification.classList.add('hidden');
+            }
+        } else {
+            playAgainBtn.textContent = 'Request Rematch';
+            playAgainBtn.disabled = false;
+            if (notification) {
+                notification.classList.add('hidden');
+            }
+        }
+        newGameBtn.textContent = 'Leave Session';
+    }
+}
+
+/**
+ * Reset rematch UI to default state (for local games)
+ */
+export function resetRematchUI() {
+    const playAgainBtn = elements.playAgainBtn;
+    const newGameBtn = elements.newGameBtn;
+    const notification = document.getElementById('rematch-notification');
+
+    playAgainBtn.textContent = 'Play Again';
+    playAgainBtn.disabled = false;
+    newGameBtn.textContent = 'New Game (Setup)';
+
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+}
+
+/**
+ * Update the guest's waiting screen region display
+ * @param {Object|null} region - Region object with name property, or null for global
+ */
+export function updateGuestRegionDisplay(region) {
+    const regionValue = document.getElementById('guest-region-value');
+    if (regionValue) {
+        if (!region) {
+            regionValue.textContent = 'Global';
+        } else if (region.relationId) {
+            regionValue.textContent = 'Custom';
+        } else {
+            regionValue.textContent = region.name;
+        }
+    }
 }

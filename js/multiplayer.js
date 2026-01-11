@@ -1,6 +1,10 @@
 /**
  * Multiplayer Module
  * Handles game synchronization over WebRTC
+ *
+ * @deprecated This module is being replaced by hostController.js and guestController.js
+ * as part of the host-authoritative architecture rewrite. Do not add new functionality here.
+ * See REWRITE_PLAN.md and REWRITE_PLAN_PHASES.md for details.
  */
 
 import * as webrtc from './webrtc.js';

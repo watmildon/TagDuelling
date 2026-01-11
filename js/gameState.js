@@ -380,3 +380,71 @@ export function hasAnyBot() {
 export function hasRegionSelected() {
     return state.region !== null;
 }
+
+/**
+ * Replace entire state (used by guest to apply host's authoritative state)
+ * This is the primary method for state synchronization in multiplayer.
+ * @param {Object} newState - Complete state object from host
+ */
+export function replaceState(newState) {
+    state = {
+        players: newState.players ? newState.players.map(p => ({
+            name: p.name || 'Player',
+            isBot: p.isBot || false
+        })) : state.players,
+        currentPlayerIndex: newState.currentPlayerIndex ?? state.currentPlayerIndex,
+        tags: newState.tags ? newState.tags.map(t => ({
+            key: t.key,
+            value: t.value
+        })) : [],
+        region: newState.region,
+        gamePhase: newState.gamePhase || state.gamePhase,
+        challenger: newState.challenger || null,
+        challengeResult: newState.challengeResult || null
+    };
+    notifySubscribers();
+}
+
+/**
+ * Replace state without notifying subscribers (for controlled sync)
+ * Use notifyStateChange() after to trigger subscribers.
+ * @param {Object} newState - Complete state object from host
+ */
+export function replaceStateSilent(newState) {
+    state = {
+        players: newState.players ? newState.players.map(p => ({
+            name: p.name || 'Player',
+            isBot: p.isBot || false
+        })) : state.players,
+        currentPlayerIndex: newState.currentPlayerIndex ?? state.currentPlayerIndex,
+        tags: newState.tags ? newState.tags.map(t => ({
+            key: t.key,
+            value: t.value
+        })) : [],
+        region: newState.region,
+        gamePhase: newState.gamePhase || state.gamePhase,
+        challenger: newState.challenger || null,
+        challengeResult: newState.challengeResult || null
+    };
+    // No notifySubscribers() call - caller must call notifyStateChange()
+}
+
+/**
+ * Manually trigger subscriber notification
+ * Use after replaceStateSilent() when ready to update UI.
+ */
+export function notifyStateChange() {
+    notifySubscribers();
+}
+
+/**
+ * Set tags directly (used for state sync)
+ * @param {Array} tags - Array of {key, value} objects
+ */
+export function setTags(tags) {
+    state.tags = tags.map(t => ({
+        key: t.key,
+        value: t.value
+    }));
+    notifySubscribers();
+}
