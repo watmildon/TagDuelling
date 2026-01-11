@@ -87,7 +87,7 @@ function init() {
 
     // Set up WebRTC callbacks
     webrtc.onConnected(handleMultiplayerConnected);
-    webrtc.onDisconnected(handleMultiplayerDisconnected);
+    webrtc.onDisconnected(() => handleMultiplayerDisconnected('connection_lost'));
 
     // Set up WebRTC message routing to appropriate controller
     webrtc.onMessage(handleWebRTCMessage);
@@ -422,6 +422,7 @@ function handleLeaveGame() {
     }
     webrtc.disconnect();
     resetMultiplayerState();
+    resetMultiplayerUI();
     state.resetToSetup();
 }
 
@@ -431,7 +432,7 @@ function handleLeaveGame() {
 function handleGuestNameChange(e) {
     clearTimeout(guestNameDebounceTimer);
     guestNameDebounceTimer = setTimeout(() => {
-        const name = e.target.value.trim() || 'Guest';
+        const name = e.target.value.trim() || 'Player 2';
         // Update local state
         state.updatePlayerName(getLocalPlayerIndex(), name);
         // Send to host via guest controller
@@ -458,8 +459,9 @@ function handleMultiplayerConnected() {
         isGuestRole = false;
 
         // Set up players for multiplayer
+        // Use "Player 2" as default - will be updated when guest sends their name
         state.updatePlayerName(0, 'Host');
-        state.updatePlayerName(1, 'Guest (connecting...)');
+        state.updatePlayerName(1, 'Player 2');
         // Ensure both players are human (no bots in multiplayer)
         state.setPlayerAsBot(0, false);
         state.setPlayerAsBot(1, false);
@@ -477,7 +479,7 @@ function handleMultiplayerConnected() {
         });
 
         hostController.setOnGuestDisconnected(() => {
-            handleMultiplayerDisconnected();
+            handleMultiplayerDisconnected('connection_lost');
         });
 
         hostController.setOnChallengeRequested(async () => {
@@ -497,8 +499,9 @@ function handleMultiplayerConnected() {
         isGuestRole = true;
 
         // Set up initial player names
+        // Guest shows "Player 2" until host's state sync arrives with authoritative names
         state.updatePlayerName(0, 'Host');
-        state.updatePlayerName(1, 'Guest');
+        state.updatePlayerName(1, 'Player 2');
         state.setPlayerAsBot(0, false);
         state.setPlayerAsBot(1, false);
 
@@ -507,8 +510,8 @@ function handleMultiplayerConnected() {
 
         // Set up guest controller callbacks
         guestController.setOnWelcomeReceived((playerIndex) => {
-            // Send initial name to host
-            const name = mpElements.guestNameInput.value.trim() || 'Guest';
+            // Send initial name to host (default to "Player 2" if empty)
+            const name = mpElements.guestNameInput.value.trim() || 'Player 2';
             guestController.setName(name);
         });
 
@@ -524,11 +527,11 @@ function handleMultiplayerConnected() {
         });
 
         guestController.setOnHostDisconnected((reason) => {
-            handleMultiplayerDisconnected();
+            handleMultiplayerDisconnected(reason);
         });
 
-        // Set default name in input
-        mpElements.guestNameInput.value = 'Guest';
+        // Set default name in input (matches default player name)
+        mpElements.guestNameInput.value = 'Player 2';
 
         // Enter waiting state
         state.enterWaitingState();
@@ -549,8 +552,9 @@ function updateStartButtonForMultiplayer() {
 
 /**
  * Handle multiplayer disconnection
+ * @param {string} reason - Optional reason for disconnect (from protocol.GameEndReason)
  */
-function handleMultiplayerDisconnected() {
+function handleMultiplayerDisconnected(reason) {
     // Shutdown controllers
     resetMultiplayerState();
 
@@ -561,7 +565,12 @@ function handleMultiplayerDisconnected() {
     elements.addPlayerBtn.classList.remove('hidden');
     // Reset players to default
     state.resetToSetup();
-    ui.showConnectionLost();
+
+    // Only show connection lost modal for unexpected disconnects
+    // Don't show it when the other player intentionally ended/left the session
+    if (reason === 'connection_lost') {
+        ui.showConnectionLost();
+    }
 }
 
 /**
@@ -733,7 +742,7 @@ function renderResultsScreen(currentState) {
         const rematchStatus = isHostRole
             ? hostController.getRematchStatus()
             : guestController.getRematchStatus();
-        ui.updateRematchUI(isHostRole, rematchStatus);
+        ui.updateRematchUI(isHostRole, rematchStatus, currentState.players);
 
         // Display session score
         const sessionWins = isHostRole

@@ -194,7 +194,7 @@ export function setOnChallengeRequested(callback) { onChallengeRequested = callb
 // Internal message handlers
 
 function handleSetName(name) {
-    const sanitizedName = (name || 'Guest').trim().substring(0, 30) || 'Guest';
+    const sanitizedName = (name || 'Player 2').trim().substring(0, 30) || 'Player 2';
     state.updatePlayerName(1, sanitizedName);
 
     if (onGuestNameChanged) {

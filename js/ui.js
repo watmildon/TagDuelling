@@ -705,11 +705,15 @@ export function hideConnectionLost() {
  * Update results screen for multiplayer rematch flow
  * @param {boolean} isHost - Whether local player is host
  * @param {Object} rematchStatus - { host: boolean, guest: boolean }
+ * @param {Array} players - Array of player objects with names
  */
-export function updateRematchUI(isHost, rematchStatus) {
+export function updateRematchUI(isHost, rematchStatus, players = []) {
     const playAgainBtn = elements.playAgainBtn;
     const newGameBtn = elements.newGameBtn;
     const notification = document.getElementById('rematch-notification');
+
+    const hostName = players[0]?.name || 'Host';
+    const guestName = players[1]?.name || 'Player 2';
 
     if (isHost) {
         // Host sees different button text based on guest's request
@@ -717,17 +721,17 @@ export function updateRematchUI(isHost, rematchStatus) {
             playAgainBtn.textContent = 'Start Rematch';
             playAgainBtn.disabled = false;
             if (notification) {
-                notification.textContent = 'Your opponent wants a rematch!';
+                notification.textContent = `${guestName} wants a rematch!`;
                 notification.classList.remove('hidden');
             }
         } else if (rematchStatus.host) {
-            playAgainBtn.textContent = 'Waiting for opponent...';
+            playAgainBtn.textContent = `Waiting for ${guestName}...`;
             playAgainBtn.disabled = true;
             if (notification) {
                 notification.classList.add('hidden');
             }
         } else {
-            playAgainBtn.textContent = 'Play Again';
+            playAgainBtn.textContent = 'Request Rematch';
             playAgainBtn.disabled = false;
             if (notification) {
                 notification.classList.add('hidden');
@@ -740,11 +744,11 @@ export function updateRematchUI(isHost, rematchStatus) {
             playAgainBtn.textContent = 'Accept Rematch';
             playAgainBtn.disabled = false;
             if (notification) {
-                notification.textContent = 'Host wants a rematch!';
+                notification.textContent = `${hostName} wants a rematch!`;
                 notification.classList.remove('hidden');
             }
         } else if (rematchStatus.guest) {
-            playAgainBtn.textContent = 'Waiting for host...';
+            playAgainBtn.textContent = `Waiting for ${hostName}...`;
             playAgainBtn.disabled = true;
             if (notification) {
                 notification.classList.add('hidden');
@@ -807,8 +811,8 @@ export function updateSessionScore(wins, players, show = true) {
     const resultsScoreText = document.getElementById('results-session-score-text');
 
     const hostName = players[0]?.name || 'Host';
-    const guestName = players[1]?.name || 'Guest';
-    const scoreHtml = `${hostName} <span class="score-value">${wins.host}</span> <span class="score-separator">-</span> <span class="score-value">${wins.guest}</span> ${guestName}`;
+    const guestName = players[1]?.name || 'Player 2';
+    const scoreHtml = `<span class="score-name">${hostName}</span> <span class="score-value">${wins.host}</span> <span class="score-separator">-</span> <span class="score-value">${wins.guest}</span> <span class="score-name">${guestName}</span>`;
 
     if (gameScore && gameScoreText) {
         gameScoreText.innerHTML = scoreHtml;
