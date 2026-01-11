@@ -4,11 +4,25 @@
 # Note: Queries with only common tags (building, name, highway) will timeout on Overpass
 
 # List of tag combinations that are known to be problematic for Overpass
-mascot	lit	name    building
-diplomatic=embassy  name   building
+diplomatic
+mascot	building
+mascot	lit	name	building
 
 # List of tag combinations that are known to be problematic for Postpass
-attraction=roller_coaster   name
+mascot
+attraction=maze	name
+golf=tee	name
+diplomatic=embassy	building
+advertising=billboard	lit
+attraction=roller_coaster	name
+amenity=pub	real_ale=yes
+shop=bakery	organic=yes
+tourism=hotel	stars=5
 name=O'Reilly's	amenity=pub
+sport=climbing	leisure=sports_centre
 
 # List of tag combinations that are known to be problematic for both Overpass and Postpass
+diplomatic=embassy	name	building
+government=parliament	name	building
+craft=brewery	name
+emergency=fire_hydrant	operator
