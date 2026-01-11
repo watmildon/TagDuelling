@@ -1,0 +1,14 @@
+# Tag Duelling Test Cases
+# Format: key or key=value, tab-separated, one combination per line
+# Lines starting with # are comments
+# Note: Queries with only common tags (building, name, highway) will timeout on Overpass
+
+# List of tag combinations that are known to be problematic for Overpass
+mascot	lit	name    building
+diplomatic=embassy  name   building
+
+# List of tag combinations that are known to be problematic for Postpass
+attraction=roller_coaster   name
+name=O'Reilly's	amenity=pub
+
+# List of tag combinations that are known to be problematic for both Overpass and Postpass
