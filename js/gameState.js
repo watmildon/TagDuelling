@@ -48,7 +48,9 @@ function createInitialState() {
         challengeResult: null, // { count: number, winner: string, loser: string }
         tournamentMode: false, // Whether to start each round with a random tag
         sessionWins: [0, 0], // Win counts per player index for local games
-        roundNumber: 0 // Current round number (0 = not started, 1 = first round, etc.)
+        roundNumber: 0, // Current round number (0 = not started, 1 = first round, etc.)
+        highscoreMode: false, // Whether playing in highscore mode (1 player vs 1 bot, streak-based)
+        currentStreak: 0 // Current win streak in highscore mode
     };
 }
 
@@ -468,6 +470,50 @@ export function setTournamentMode(enabled) {
  */
 export function isTournamentMode() {
     return state.tournamentMode === true;
+}
+
+/**
+ * Set highscore mode
+ * @param {boolean} enabled - Whether highscore mode is enabled
+ */
+export function setHighscoreMode(enabled) {
+    state.highscoreMode = enabled;
+    if (enabled) {
+        state.currentStreak = 0;
+    }
+    notifySubscribers();
+}
+
+/**
+ * Check if highscore mode is enabled
+ * @returns {boolean}
+ */
+export function isHighscoreMode() {
+    return state.highscoreMode === true;
+}
+
+/**
+ * Get current streak in highscore mode
+ * @returns {number}
+ */
+export function getCurrentStreak() {
+    return state.currentStreak;
+}
+
+/**
+ * Increment streak in highscore mode (called when player wins a round)
+ */
+export function incrementStreak() {
+    state.currentStreak++;
+    notifySubscribers();
+}
+
+/**
+ * Reset streak to 0 (called when starting a new highscore attempt)
+ */
+export function resetStreak() {
+    state.currentStreak = 0;
+    notifySubscribers();
 }
 
 /**
