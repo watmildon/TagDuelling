@@ -1,0 +1,29 @@
+# AI Agent Files
+.claude/
+CLAUDE.md
+
+# GitHub Copilot
+.github/copilot-instructions.md
+copilot-instructions.md
+
+# ChatGPT / OpenAI
+.chatgpt/
+chatgpt.md
+CHATGPT.md
+
+# Cursor
+.cursor/
+.cursorules
+.cursorrules
+
+# Windsurf / Codeium
+.windsurf/
+.codeium/
+
+# Aider
+.aider*
+aider.conf.yml
+
+# Other AI assistants
+.ai/
+AI.md
