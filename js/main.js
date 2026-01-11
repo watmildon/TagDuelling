@@ -313,6 +313,7 @@ function handleNewGame() {
         }
     }
     resetMultiplayerState();
+    state.resetSessionWins();
     state.resetToSetup();
 }
 
@@ -329,6 +330,7 @@ function handleBackToSetup() {
         }
     }
     resetMultiplayerState();
+    state.resetSessionWins();
     state.resetToSetup();
 }
 
@@ -752,7 +754,10 @@ function renderGameScreen(currentState) {
             : guestController.getSessionWins();
         ui.updateSessionScore(sessionWins, currentState.players, true);
     } else {
-        ui.hideSessionScore();
+        // Local game - show session score with local wins
+        const localWins = state.getSessionWins();
+        const sessionWins = { host: localWins[0], guest: localWins[1] };
+        ui.updateSessionScore(sessionWins, currentState.players, true);
     }
 }
 
@@ -763,7 +768,7 @@ function renderResultsScreen(currentState) {
     const ultraLink = overpass.buildUltraLink(currentState.tags, currentState.region);
     ui.renderResults(currentState.challengeResult, currentState.tags, ultraLink);
 
-    // Update rematch UI and session score for multiplayer
+    // Update rematch UI and session score
     if (isMultiplayerMode()) {
         const rematchStatus = isHostRole
             ? hostController.getRematchStatus()
@@ -777,7 +782,10 @@ function renderResultsScreen(currentState) {
         ui.updateSessionScore(sessionWins, currentState.players, true);
     } else {
         ui.resetRematchUI();
-        ui.hideSessionScore();
+        // Local game - show session score with local wins
+        const localWins = state.getSessionWins();
+        const sessionWins = { host: localWins[0], guest: localWins[1] };
+        ui.updateSessionScore(sessionWins, currentState.players, true);
     }
 }
 
@@ -875,6 +883,12 @@ async function handleStartGame() {
 
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
+
+    // Sync tournament mode checkbox to state (in case state was reset but checkbox stayed checked)
+    const tournamentCheckbox = document.getElementById('tournament-mode-checkbox');
+    if (tournamentCheckbox) {
+        state.setTournamentMode(tournamentCheckbox.checked);
+    }
 
     // Clear bot's combination cache for fresh game
     bot.clearCombinationCache();
@@ -1031,16 +1045,19 @@ async function executeChallengeQuery(tags, region) {
             return;
         }
 
-        // Record win for multiplayer session tracking BEFORE setting result
+        // Record win for session tracking BEFORE setting result
         // (setChallengeResult triggers UI render, so wins must be recorded first)
+        const currentState = state.getState();
+        const challengerIndex = currentState.currentPlayerIndex;
+        const previousPlayerIndex = (challengerIndex - 1 + currentState.players.length) % currentState.players.length;
+        // count === 0 means challenger wins, otherwise previous player wins
+        const winnerIndex = count === 0 ? challengerIndex : previousPlayerIndex;
+
         if (isMultiplayerMode() && isHostRole) {
-            // Determine winner based on count (same logic as setChallengeResult)
-            const currentState = state.getState();
-            const challengerIndex = currentState.currentPlayerIndex;
-            const previousPlayerIndex = (challengerIndex - 1 + 2) % 2;
-            // count === 0 means challenger wins, otherwise previous player wins
-            const winnerIndex = count === 0 ? challengerIndex : previousPlayerIndex;
             hostController.recordWin(winnerIndex);
+        } else if (!isMultiplayerMode()) {
+            // Local game - record win in gameState
+            state.recordWin(winnerIndex);
         }
 
         // Set result (this triggers UI render via state subscribers)

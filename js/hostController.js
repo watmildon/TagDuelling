@@ -305,19 +305,8 @@ async function handleGuestRematchRequest() {
 async function startNewRound() {
     rematchRequested = { host: false, guest: false };
 
-    // Get current round number and alternate starting player
-    const currentState = state.getState();
-    const currentRound = currentState.roundNumber || 1;
-    const nextRound = currentRound + 1;
-    const nextStartingPlayer = (nextRound - 1) % 2;
-
+    // playAgain() handles round number increment and starting player cycling
     await state.playAgain();
-
-    // Set the starting player for the new round
-    // Note: playAgain() resets to player 0, so we may need to adjust
-    if (nextStartingPlayer === 1) {
-        state.nextTurn(); // Move to player 1
-    }
 
     broadcastState();
 

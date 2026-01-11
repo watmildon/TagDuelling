@@ -46,7 +46,9 @@ function createInitialState() {
         gamePhase: PHASES.SETUP,
         challenger: null, // Player who initiated challenge
         challengeResult: null, // { count: number, winner: string, loser: string }
-        tournamentMode: false // Whether to start each round with a random tag
+        tournamentMode: false, // Whether to start each round with a random tag
+        sessionWins: [0, 0], // Win counts per player index for local games
+        roundNumber: 0 // Current round number (0 = not started, 1 = first round, etc.)
     };
 }
 
@@ -258,7 +260,8 @@ export function enterWaitingState() {
  */
 export async function startGame() {
     state.gamePhase = PHASES.PLAYING;
-    state.currentPlayerIndex = 0;
+    state.roundNumber = 1;
+    state.currentPlayerIndex = 0; // First round always starts with player 0
     state.tags = [];
     state.challenger = null;
     state.challengeResult = null;
@@ -322,11 +325,14 @@ export function setChallengeResult(count) {
 /**
  * Reset for a new round (same players, same region)
  * If tournament mode is enabled, generates a new random starting tag
+ * Cycles starting player through all players each round
  * @returns {Promise<void>}
  */
 export async function playAgain() {
     state.tags = [];
-    state.currentPlayerIndex = 0;
+    state.roundNumber = (state.roundNumber || 0) + 1;
+    // Cycle starting player: round 1 -> player 0, round 2 -> player 1, etc.
+    state.currentPlayerIndex = (state.roundNumber - 1) % state.players.length;
     state.gamePhase = PHASES.PLAYING;
     state.challenger = null;
     state.challengeResult = null;
@@ -403,6 +409,32 @@ export function isCurrentPlayerBot() {
  */
 export function hasAnyBot() {
     return state.players.some(player => player.isBot === true);
+}
+
+/**
+ * Record a win for a player (local games)
+ * @param {number} playerIndex - Index of the winning player
+ */
+export function recordWin(playerIndex) {
+    if (playerIndex >= 0 && playerIndex < state.sessionWins.length) {
+        state.sessionWins[playerIndex]++;
+    }
+}
+
+/**
+ * Get session wins for local games
+ * @returns {Array} Win counts per player index
+ */
+export function getSessionWins() {
+    return [...state.sessionWins];
+}
+
+/**
+ * Reset session wins (when returning to setup)
+ */
+export function resetSessionWins() {
+    state.sessionWins = [0, 0];
+    state.roundNumber = 0;
 }
 
 /**
