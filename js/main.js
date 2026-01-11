@@ -8,7 +8,11 @@ import * as ui from './ui.js';
 import * as overpass from './overpass.js';
 import * as bot from './bot.js';
 import * as webrtc from './webrtc.js';
-import * as multiplayer from './multiplayer.js';
+import * as hostController from './hostController.js';
+import * as guestController from './guestController.js';
+
+// DEPRECATED: multiplayer.js is being phased out
+// import * as multiplayer from './multiplayer.js';
 
 // Local storage keys
 const STORAGE_KEYS = {
@@ -20,6 +24,47 @@ const STORAGE_KEYS = {
 // Multiplayer UI element references
 let mpElements = null;
 
+// Debounce timer for guest name input
+let guestNameDebounceTimer = null;
+
+// Track current multiplayer role
+let isHostRole = false;
+let isGuestRole = false;
+
+/**
+ * Check if currently in multiplayer mode (either as host or guest)
+ * @returns {boolean}
+ */
+function isMultiplayerMode() {
+    return webrtc.isConnected() && (hostController.isInitialized() || guestController.isInitialized());
+}
+
+/**
+ * Check if it's the local player's turn
+ * @returns {boolean}
+ */
+function isLocalPlayerTurn() {
+    if (!isMultiplayerMode()) return true;
+
+    const currentState = state.getState();
+    if (isHostRole) {
+        return currentState.currentPlayerIndex === 0;
+    } else if (isGuestRole) {
+        return currentState.currentPlayerIndex === 1;
+    }
+    return true;
+}
+
+/**
+ * Get local player index (0 for host, 1 for guest)
+ * @returns {number}
+ */
+function getLocalPlayerIndex() {
+    if (isHostRole) return 0;
+    if (isGuestRole) return 1;
+    return 0;
+}
+
 /**
  * Initialize the application
  */
@@ -29,9 +74,6 @@ function init() {
 
     // Initialize multiplayer elements
     initMultiplayerElements();
-
-    // Initialize multiplayer module
-    multiplayer.init();
 
     // Load saved preferences
     loadPreferences(elements);
@@ -43,13 +85,28 @@ function init() {
     // Subscribe to state changes
     state.subscribe(handleStateChange);
 
-    // Set up multiplayer callbacks
-    multiplayer.onRemoteAction(handleRemoteAction);
+    // Set up WebRTC callbacks
     webrtc.onConnected(handleMultiplayerConnected);
-    webrtc.onDisconnected(handleMultiplayerDisconnected);
+    webrtc.onDisconnected(() => handleMultiplayerDisconnected('connection_lost'));
+
+    // Set up WebRTC message routing to appropriate controller
+    webrtc.onMessage(handleWebRTCMessage);
 
     // Initial render
     renderFromState();
+}
+
+/**
+ * Route WebRTC messages to the appropriate controller
+ */
+function handleWebRTCMessage(message) {
+    if (!webrtc.isConnected()) return;
+
+    if (isHostRole && hostController.isInitialized()) {
+        hostController.handleGuestMessage(message);
+    } else if (isGuestRole && guestController.isInitialized()) {
+        guestController.handleHostMessage(message);
+    }
 }
 
 /**
@@ -187,25 +244,50 @@ function bindMultiplayerEvents() {
     // Waiting screen
     mpElements.leaveGameBtn.addEventListener('click', handleLeaveGame);
     mpElements.guestNameInput.addEventListener('input', handleGuestNameChange);
+
+    // Connection lost overlay
+    const connectionLostOkBtn = document.getElementById('connection-lost-ok-btn');
+    if (connectionLostOkBtn) {
+        connectionLostOkBtn.addEventListener('click', () => {
+            ui.hideConnectionLost();
+            state.resetToSetup();
+        });
+    }
 }
 
 /**
  * Handle Play Again button
  */
 function handlePlayAgain() {
-    if (multiplayer.isMultiplayerMode()) {
-        multiplayer.sendPlayAgain();
+    if (isMultiplayerMode()) {
+        if (isHostRole) {
+            // Host requests rematch
+            hostController.handleLocalRematchRequest();
+        } else if (isGuestRole) {
+            // Guest requests rematch
+            guestController.requestRematch();
+        }
+    } else {
+        // Local game - just restart
+        state.playAgain();
     }
-    state.playAgain();
 }
 
 /**
  * Handle New Game button
  */
 function handleNewGame() {
-    if (multiplayer.isMultiplayerMode()) {
-        multiplayer.sendBackToSetup();
+    if (isMultiplayerMode()) {
+        if (isHostRole) {
+            // Host ends session
+            hostController.endSession();
+        } else if (isGuestRole) {
+            // Guest leaves - just disconnect and reset locally
+            guestController.shutdown();
+            webrtc.disconnect();
+        }
     }
+    resetMultiplayerState();
     state.resetToSetup();
 }
 
@@ -213,11 +295,30 @@ function handleNewGame() {
  * Handle Back to Setup button (from game screen)
  */
 function handleBackToSetup() {
-    if (multiplayer.isMultiplayerMode()) {
-        multiplayer.sendBackToSetup();
-        multiplayer.reset();
+    if (isMultiplayerMode()) {
+        if (isHostRole) {
+            hostController.endSession();
+        } else if (isGuestRole) {
+            guestController.shutdown();
+            webrtc.disconnect();
+        }
     }
+    resetMultiplayerState();
     state.resetToSetup();
+}
+
+/**
+ * Reset multiplayer state variables
+ */
+function resetMultiplayerState() {
+    isHostRole = false;
+    isGuestRole = false;
+    if (hostController.isInitialized()) {
+        hostController.shutdown();
+    }
+    if (guestController.isInitialized()) {
+        guestController.shutdown();
+    }
 }
 
 /**
@@ -296,8 +397,13 @@ async function handleJoinRoom() {
  * Handle Disconnect button
  */
 function handleDisconnect() {
+    if (isHostRole) {
+        hostController.endSession();
+    } else if (isGuestRole) {
+        guestController.shutdown();
+    }
     webrtc.disconnect();
-    multiplayer.reset();
+    resetMultiplayerState();
     resetMultiplayerUI();
     // Reset UI for local mode
     const elements = ui.getElements();
@@ -311,50 +417,123 @@ function handleDisconnect() {
  * Handle Leave Game button (from waiting screen)
  */
 function handleLeaveGame() {
+    if (isGuestRole) {
+        guestController.shutdown();
+    }
     webrtc.disconnect();
-    multiplayer.reset();
+    resetMultiplayerState();
+    resetMultiplayerUI();
     state.resetToSetup();
 }
 
 /**
- * Handle guest name input change
+ * Handle guest name input change (with debounce)
  */
 function handleGuestNameChange(e) {
-    const name = e.target.value.trim() || 'Guest';
-    // Update local state
-    state.updatePlayerName(multiplayer.getLocalPlayerIndex(), name);
-    // Send to host
-    multiplayer.sendPlayerName(name);
+    clearTimeout(guestNameDebounceTimer);
+    guestNameDebounceTimer = setTimeout(() => {
+        const name = e.target.value.trim() || 'Player 2';
+        // Update local state
+        state.updatePlayerName(getLocalPlayerIndex(), name);
+        // Send to host via guest controller
+        if (isGuestRole && guestController.isInitialized()) {
+            guestController.setName(name);
+        }
+    }, 300);
 }
 
 /**
  * Handle multiplayer connection established
  */
 function handleMultiplayerConnected() {
-    // Notify multiplayer module that connection is established
-    // (webrtc only supports one callback, so we need to forward this)
-    multiplayer.notifyConnected();
-
     showMultiplayerSection('connected');
 
+    // Immediately hide add player button in multiplayer mode
+    // This must happen before any state updates that trigger re-renders
+    const elements = ui.getElements();
+    elements.addPlayerBtn.classList.add('hidden');
+
     if (webrtc.getIsHost()) {
-        // Host: set up players for multiplayer, stay on setup screen
+        // Host: initialize host controller
+        isHostRole = true;
+        isGuestRole = false;
+
+        // Set up players for multiplayer
+        // Use "Player 2" as default - will be updated when guest sends their name
         state.updatePlayerName(0, 'Host');
-        state.updatePlayerName(1, 'Guest (connecting...)');
+        state.updatePlayerName(1, 'Player 2');
         // Ensure both players are human (no bots in multiplayer)
         state.setPlayerAsBot(0, false);
         state.setPlayerAsBot(1, false);
+
+        // Initialize host controller
+        hostController.initialize();
+
+        // Set up host controller callbacks
+        hostController.setOnGuestNameChanged((name) => {
+            renderFromState();
+        });
+
+        hostController.setOnRematchStatusChanged((status) => {
+            renderFromState();
+        });
+
+        hostController.setOnGuestDisconnected(() => {
+            handleMultiplayerDisconnected('connection_lost');
+        });
+
+        hostController.setOnChallengeRequested(async () => {
+            // Guest initiated challenge - host runs the query
+            const currentState = state.getState();
+            await executeChallengeQuery(currentState.tags, currentState.region);
+        });
+
         // Update start button text
         updateStartButtonForMultiplayer();
+
+        // Re-render to hide add player button and update UI for multiplayer
+        renderFromState();
     } else {
-        // Guest: enter waiting state immediately
+        // Guest: initialize guest controller
+        isHostRole = false;
+        isGuestRole = true;
+
+        // Set up initial player names
+        // Guest shows "Player 2" until host's state sync arrives with authoritative names
         state.updatePlayerName(0, 'Host');
-        state.updatePlayerName(1, 'Guest');
+        state.updatePlayerName(1, 'Player 2');
         state.setPlayerAsBot(0, false);
         state.setPlayerAsBot(1, false);
-        // Set default name in input and send to host
-        mpElements.guestNameInput.value = 'Guest';
-        multiplayer.sendPlayerName('Guest');
+
+        // Initialize guest controller
+        guestController.initialize();
+
+        // Set up guest controller callbacks
+        guestController.setOnWelcomeReceived((playerIndex) => {
+            // Send initial name to host (default to "Player 2" if empty)
+            const name = mpElements.guestNameInput.value.trim() || 'Player 2';
+            guestController.setName(name);
+        });
+
+        guestController.setOnStateReceived((receivedState) => {
+            // State has been applied by the controller
+            // Just re-render UI
+            renderFromState();
+        });
+
+        guestController.setOnActionRejected((reason, message) => {
+            ui.hidePendingAction();
+            ui.showError(message);
+        });
+
+        guestController.setOnHostDisconnected((reason) => {
+            handleMultiplayerDisconnected(reason);
+        });
+
+        // Set default name in input (matches default player name)
+        mpElements.guestNameInput.value = 'Player 2';
+
+        // Enter waiting state
         state.enterWaitingState();
     }
 }
@@ -364,7 +543,7 @@ function handleMultiplayerConnected() {
  */
 function updateStartButtonForMultiplayer() {
     const elements = ui.getElements();
-    if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
+    if (isMultiplayerMode() && isHostRole) {
         elements.startGameBtn.textContent = 'Start Remote Game';
     } else {
         elements.startGameBtn.textContent = 'Start Local Game';
@@ -373,10 +552,11 @@ function updateStartButtonForMultiplayer() {
 
 /**
  * Handle multiplayer disconnection
+ * @param {string} reason - Optional reason for disconnect (from protocol.GameEndReason)
  */
-function handleMultiplayerDisconnected() {
-    // Notify multiplayer module that connection is lost
-    multiplayer.notifyDisconnected();
+function handleMultiplayerDisconnected(reason) {
+    // Shutdown controllers
+    resetMultiplayerState();
 
     resetMultiplayerUI();
     // Reset UI for local mode
@@ -385,17 +565,12 @@ function handleMultiplayerDisconnected() {
     elements.addPlayerBtn.classList.remove('hidden');
     // Reset players to default
     state.resetToSetup();
-    ui.showError('Connection lost. Please start a new game to play again.');
-}
 
-/**
- * Handle remote action from multiplayer module
- */
-function handleRemoteAction(actionType, data) {
-    console.log('Remote action:', actionType, data);
-    // State is already updated by multiplayer module
-    // Just need to re-render
-    renderFromState();
+    // Only show connection lost modal for unexpected disconnects
+    // Don't show it when the other player intentionally ended/left the session
+    if (reason === 'connection_lost') {
+        ui.showConnectionLost();
+    }
 }
 
 /**
@@ -452,6 +627,8 @@ function renderFromState() {
         case state.PHASES.WAITING:
             // Guest waiting for host to start
             ui.showScreen('waiting');
+            // Update region display for guest
+            ui.updateGuestRegionDisplay(currentState.region);
             break;
 
         case state.PHASES.PLAYING:
@@ -462,9 +639,15 @@ function renderFromState() {
         case state.PHASES.CHALLENGE:
             // Keep showing game screen during challenge
             ui.showScreen('game');
+            // Show loading overlay for remote player waiting for query result
+            if (isMultiplayerMode() && isGuestRole) {
+                ui.showLoading();
+            }
             break;
 
         case state.PHASES.FINISHED:
+            // Hide loading overlay (in case guest was waiting for query result)
+            ui.hideLoading();
             ui.showScreen('results');
             renderResultsScreen(currentState);
             break;
@@ -477,10 +660,10 @@ function renderFromState() {
 function renderSetupScreen(currentState) {
     const hasBots = state.hasAnyBot();
     const hasRegion = state.hasRegionSelected();
-    const isMultiplayerMode = multiplayer.isMultiplayerMode();
+    const inMultiplayer = isMultiplayerMode();
 
     // Update conflict warnings and disabled states
-    ui.updateBotRegionConflictState(hasBots, hasRegion);
+    ui.updateBotRegionConflictState(hasBots, hasRegion, inMultiplayer);
 
     // If bots are present and region was reset, clear localStorage
     if (hasBots && !hasRegion) {
@@ -490,28 +673,28 @@ function renderSetupScreen(currentState) {
 
     // Hide add player button in multiplayer mode
     const elements = ui.getElements();
-    elements.addPlayerBtn.classList.toggle('hidden', isMultiplayerMode);
+    elements.addPlayerBtn.classList.toggle('hidden', inMultiplayer);
 
     // Build multiplayer options if in multiplayer mode
-    const multiplayerOptions = isMultiplayerMode ? {
+    const multiplayerOptions = inMultiplayer ? {
         isMultiplayer: true,
-        localPlayerIndex: multiplayer.getLocalPlayerIndex()
+        localPlayerIndex: getLocalPlayerIndex()
     } : null;
 
     ui.renderPlayerList(
         currentState.players,
         (index, name) => {
             state.updatePlayerName(index, name);
-            // Send name to remote player if in multiplayer
-            if (isMultiplayerMode && index === multiplayer.getLocalPlayerIndex()) {
-                multiplayer.sendPlayerName(name);
+            // Send name to host if guest in multiplayer
+            if (inMultiplayer && isGuestRole && index === getLocalPlayerIndex()) {
+                guestController.setName(name);
             }
         },
         (index) => state.removePlayer(index),
         (index, isBot) => {
             state.setPlayerAsBot(index, isBot);
         },
-        hasRegion || isMultiplayerMode, // Disable bot toggles if region is selected or in multiplayer
+        hasRegion || inMultiplayer, // Disable bot toggles if region is selected or in multiplayer
         multiplayerOptions
     );
 }
@@ -528,10 +711,22 @@ function renderGameScreen(currentState) {
     );
     ui.renderTagPool(currentState.tags);
 
-    // In multiplayer, disable controls when it's not the local player's turn
-    if (multiplayer.isMultiplayerMode()) {
-        const isLocalTurn = multiplayer.isLocalPlayerTurn();
+    // Update abandon button text based on game mode
+    const elements = ui.getElements();
+    elements.backToSetupBtn.textContent = isMultiplayerMode() ? 'Abandon Game' : 'Back to Setup';
+
+    // In multiplayer, disable controls when it's not the local player's turn and show session score
+    if (isMultiplayerMode()) {
+        const isLocalTurn = isLocalPlayerTurn();
         ui.setGameControlsEnabled(isLocalTurn);
+
+        // Display session score
+        const sessionWins = isHostRole
+            ? hostController.getSessionWins()
+            : guestController.getSessionWins();
+        ui.updateSessionScore(sessionWins, currentState.players, true);
+    } else {
+        ui.hideSessionScore();
     }
 }
 
@@ -541,6 +736,23 @@ function renderGameScreen(currentState) {
 function renderResultsScreen(currentState) {
     const ultraLink = overpass.buildUltraLink(currentState.tags, currentState.region);
     ui.renderResults(currentState.challengeResult, currentState.tags, ultraLink);
+
+    // Update rematch UI and session score for multiplayer
+    if (isMultiplayerMode()) {
+        const rematchStatus = isHostRole
+            ? hostController.getRematchStatus()
+            : guestController.getRematchStatus();
+        ui.updateRematchUI(isHostRole, rematchStatus, currentState.players);
+
+        // Display session score
+        const sessionWins = isHostRole
+            ? hostController.getSessionWins()
+            : guestController.getSessionWins();
+        ui.updateSessionScore(sessionWins, currentState.players, true);
+    } else {
+        ui.resetRematchUI();
+        ui.hideSessionScore();
+    }
 }
 
 /**
@@ -581,6 +793,11 @@ function handleRegionChange(e) {
     if (regionData && regionData.relationId) {
         localStorage.setItem(STORAGE_KEYS.RELATION_ID, regionData.relationId);
     }
+
+    // Broadcast region change to guest in multiplayer
+    if (isMultiplayerMode() && isHostRole) {
+        hostController.broadcastState();
+    }
 }
 
 /**
@@ -593,11 +810,16 @@ function handleRelationIdInput(e) {
     if (relationId) {
         state.setRegion({
             relationId: relationId,
-            displayName: `Relation ${relationId}`
+            name: `Relation ${relationId}`
         });
         localStorage.setItem(STORAGE_KEYS.RELATION_ID, relationId);
     } else {
         state.setRegion(null);
+    }
+
+    // Broadcast region change to guest in multiplayer
+    if (isMultiplayerMode() && isHostRole) {
+        hostController.broadcastState();
     }
 }
 
@@ -605,19 +827,25 @@ function handleRelationIdInput(e) {
  * Handle start game button
  */
 function handleStartGame() {
+    // Check for bots in multiplayer mode
+    if (isMultiplayerMode() && state.hasAnyBot()) {
+        ui.showError("Bots are not supported in multiplayer mode");
+        return;
+    }
+
     const regionData = ui.getSelectedRegion();
     state.setRegion(regionData);
 
     // Clear bot's combination cache for fresh game
     bot.clearCombinationCache();
 
-    // In multiplayer, host sends game start to guest
-    if (multiplayer.isMultiplayerMode() && webrtc.getIsHost()) {
-        const currentState = state.getState();
-        multiplayer.sendGameStart(regionData, currentState.players);
-    }
-
+    // Start the game
     state.startGame();
+
+    // In multiplayer, host broadcasts the new state to guest
+    if (isMultiplayerMode() && isHostRole) {
+        hostController.broadcastState();
+    }
 }
 
 /**
@@ -625,7 +853,7 @@ function handleStartGame() {
  */
 function handleSubmit() {
     // In multiplayer, only allow submit on local player's turn
-    if (multiplayer.isMultiplayerMode() && !multiplayer.isLocalPlayerTurn()) {
+    if (isMultiplayerMode() && !isLocalPlayerTurn()) {
         ui.showError("It's not your turn!");
         return;
     }
@@ -637,40 +865,76 @@ function handleSubmit() {
         return;
     }
 
-    if (validation.type === 'new') {
-        // Adding a new tag
-        const { key, value } = validation.data;
-        const success = state.addTag(key, value);
-        if (!success) {
-            ui.showError('That key already exists. Specify a value for it instead.');
-            return;
-        }
-        // Send to remote in multiplayer
-        if (multiplayer.isMultiplayerMode()) {
-            multiplayer.sendAddTag(key, value);
-        }
-    } else if (validation.type === 'value') {
-        // Specifying a value for existing key
-        const { tagIndex, value } = validation.data;
-        const currentState = state.getState();
-        const tag = currentState.tags[tagIndex];
-        if (!tag) {
-            ui.showError('Invalid tag reference');
-            return;
-        }
-        const success = state.specifyTagValue(tag.key, value);
-        if (!success) {
-            ui.showError('Failed to set value');
-            return;
-        }
-        // Send to remote in multiplayer
-        if (multiplayer.isMultiplayerMode()) {
-            multiplayer.sendSpecifyValue(tag.key, value);
-        }
-    }
+    if (isMultiplayerMode()) {
+        if (isHostRole) {
+            // Host: apply locally and broadcast
+            if (validation.type === 'new') {
+                const { key, value } = validation.data;
+                const success = state.addTag(key, value);
+                if (!success) {
+                    ui.showError('That key already exists. Specify a value for it instead.');
+                    return;
+                }
+            } else if (validation.type === 'value') {
+                const { tagIndex, value } = validation.data;
+                const currentState = state.getState();
+                const tag = currentState.tags[tagIndex];
+                if (!tag) {
+                    ui.showError('Invalid tag reference');
+                    return;
+                }
+                const success = state.specifyTagValue(tag.key, value);
+                if (!success) {
+                    ui.showError('Failed to set value');
+                    return;
+                }
+            }
+            state.nextTurn();
+            hostController.broadcastState();
+        } else if (isGuestRole) {
+            // Guest: send action to host, show pending state
+            ui.showPendingAction();
 
-    // Move to next turn
-    state.nextTurn();
+            if (validation.type === 'new') {
+                const { key, value } = validation.data;
+                guestController.submitTurn('add_tag', key, value);
+            } else if (validation.type === 'value') {
+                const { tagIndex, value } = validation.data;
+                const currentState = state.getState();
+                const tag = currentState.tags[tagIndex];
+                if (!tag) {
+                    ui.showError('Invalid tag reference');
+                    return;
+                }
+                guestController.submitTurn('specify_value', tag.key, value);
+            }
+            // State will be updated when host broadcasts new state
+        }
+    } else {
+        // Local game - apply directly
+        if (validation.type === 'new') {
+            const { key, value } = validation.data;
+            const success = state.addTag(key, value);
+            if (!success) {
+                ui.showError('That key already exists. Specify a value for it instead.');
+                return;
+            }
+        } else if (validation.type === 'value') {
+            const { tagIndex, value } = validation.data;
+            const currentState = state.getState();
+            const tag = currentState.tags[tagIndex];
+            if (!tag) {
+                ui.showError('Invalid tag reference');
+                return;
+            }
+            const success = state.specifyTagValue(tag.key, value);
+            if (!success) {
+                ui.showError('Failed to set value');
+                return;
+            }
+        }
+        state.nextTurn();
+    }
 }
 
 /**
@@ -678,23 +942,30 @@ function handleSubmit() {
  */
 async function handleChallenge() {
     // In multiplayer, only allow challenge on local player's turn
-    if (multiplayer.isMultiplayerMode() && !multiplayer.isLocalPlayerTurn()) {
+    if (isMultiplayerMode() && !isLocalPlayerTurn()) {
         ui.showError("It's not your turn!");
         return;
     }
 
     const currentState = state.getState();
 
-    // Initiate challenge
-    state.initiateChallenge();
-
-    // Send challenge to remote in multiplayer
-    if (multiplayer.isMultiplayerMode()) {
-        multiplayer.sendChallenge();
+    if (isMultiplayerMode()) {
+        if (isHostRole) {
+            // Host challenges - initiate and run query
+            state.initiateChallenge();
+            hostController.broadcastState();
+            await executeChallengeQuery(currentState.tags, currentState.region);
+        } else if (isGuestRole) {
+            // Guest challenges - send to host, host will run query
+            ui.showPendingAction();
+            guestController.challenge();
+            // Host will execute query and broadcast result
+        }
+    } else {
+        // Local game
+        state.initiateChallenge();
+        await executeChallengeQuery(currentState.tags, currentState.region);
     }
-
-    // Execute query with retry support
-    await executeChallengeQuery(currentState.tags, currentState.region);
 }
 
 /**
@@ -706,15 +977,39 @@ async function executeChallengeQuery(tags, region) {
     ui.showLoading();
 
     try {
-        const count = await overpass.executeCountQuery(tags, region);
-
-        // Send result to remote in multiplayer
-        if (multiplayer.isMultiplayerMode()) {
-            multiplayer.sendChallengeResult(count);
+        // Check if still connected (for multiplayer)
+        if (isMultiplayerMode() && !webrtc.isConnected()) {
+            console.warn('Connection lost during query setup');
+            return;
         }
 
-        // Set result
+        const count = await overpass.executeCountQuery(tags, region);
+
+        // Check if still connected after query (for multiplayer)
+        if (isMultiplayerMode() && !webrtc.isConnected()) {
+            console.warn('Connection lost during query execution');
+            return;
+        }
+
+        // Record win for multiplayer session tracking BEFORE setting result
+        // (setChallengeResult triggers UI render, so wins must be recorded first)
+        if (isMultiplayerMode() && isHostRole) {
+            // Determine winner based on count (same logic as setChallengeResult)
+            const currentState = state.getState();
+            const challengerIndex = currentState.currentPlayerIndex;
+            const previousPlayerIndex = (challengerIndex - 1 + 2) % 2;
+            // count === 0 means challenger wins, otherwise previous player wins
+            const winnerIndex = count === 0 ? challengerIndex : previousPlayerIndex;
+            hostController.recordWin(winnerIndex);
+        }
+
+        // Set result (this triggers UI render via state subscribers)
         state.setChallengeResult(count);
+
+        // Broadcast updated state to guest
+        if (isMultiplayerMode() && isHostRole) {
+            hostController.broadcastState();
+        }
     } catch (error) {
         console.error('Overpass query failed:', error);
 
@@ -737,6 +1032,11 @@ async function executeChallengeQuery(tags, region) {
 
         // User declined retry or error is not retryable - go back to playing state
         state.playAgain();
+
+        // Broadcast recovery state if host
+        if (isMultiplayerMode() && isHostRole) {
+            hostController.broadcastState();
+        }
     } finally {
         ui.hideLoading();
     }
