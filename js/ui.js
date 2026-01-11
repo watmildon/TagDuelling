@@ -44,6 +44,7 @@ export function initElements() {
         resultTitle: document.getElementById('result-title'),
         resultMessage: document.getElementById('result-message'),
         resultCount: document.getElementById('result-count'),
+        timeoutNote: document.getElementById('timeout-note'),
         overpassLink: document.getElementById('overpass-link'),
         finalTagList: document.getElementById('final-tag-list'),
         playAgainBtn: document.getElementById('play-again-btn'),
@@ -409,9 +410,11 @@ export function renderResults(result, tags, ultraLink) {
 
     // Result count with formatting
     if (result.count === Infinity) {
-        elements.resultCount.textContent = 'Many (query timed out)';
+        elements.resultCount.textContent = 'Many?? (query timed out)';
+        elements.timeoutNote.classList.remove('hidden');
     } else {
         elements.resultCount.textContent = result.count.toLocaleString();
+        elements.timeoutNote.classList.add('hidden');
     }
 
     // Overpass link

@@ -114,7 +114,7 @@
             <button id="start-game-btn" class="btn btn-primary btn-large">Start Local Game</button>
 
             <div class="card multiplayer-card">
-                <h2>Online Multiplayer (experimental)</h2>
+                <h2>Online Multiplayer</h2>
                 <p class="multiplayer-intro">Play with a friend over the internet. No account needed - just share a room code!</p>
 
                 <div id="multiplayer-default" class="multiplayer-section">
@@ -232,6 +232,10 @@
 
                 <div class="result-details">
                     <p><strong>Objects found:</strong> <span id="result-count"></span></p>
+                    <p id="timeout-note" class="timeout-note hidden">
+                        Query timed out? We'd love to hear about the tags that caused it!
+                        <a href="https://github.com/watmildon/TagDuelling/issues/14" target="_blank" rel="noopener noreferrer">Report it here</a>
+                    </p>
                     <a id="overpass-link" href="#" target="_blank" class="btn btn-secondary">View on Ultra</a>
                 </div>
 

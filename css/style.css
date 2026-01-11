@@ -783,6 +783,16 @@ body[data-theme="dark"] .theme-icon::before {
     color: var(--accent-primary);
 }
 
+.timeout-note {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.timeout-note a {
+    color: var(--accent-primary);
+}
+
 #overpass-link {
     color: var(--accent-primary);
     text-decoration: underline;
