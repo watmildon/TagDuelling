@@ -17,6 +17,7 @@ let retryCount = 0;
 let heartbeatInterval = null;
 let guestConnected = false;
 let rematchRequested = { host: false, guest: false };
+let sessionWins = { host: 0, guest: 0 };
 
 // Callbacks for UI updates and game events
 let onGuestNameChanged = null;
@@ -42,6 +43,7 @@ export function initialize() {
     retryCount = 0;
     pendingAck = false;
     rematchRequested = { host: false, guest: false };
+    sessionWins = { host: 0, guest: 0 };
 
     // Send welcome message
     sendToGuest(protocol.createWelcome(1));
@@ -95,7 +97,7 @@ export function broadcastState() {
     incrementVersion();
     const currentState = state.getState();
 
-    const message = protocol.createStateSync(currentState, stateVersion, rematchRequested);
+    const message = protocol.createStateSync(currentState, stateVersion, rematchRequested, sessionWins);
     pendingAck = true;
     retryCount = 0;
 
@@ -167,7 +169,20 @@ export function shutdown() {
     retryCount = 0;
     pendingAck = false;
     rematchRequested = { host: false, guest: false };
+    sessionWins = { host: 0, guest: 0 };
     console.log('HostController: Shutdown');
+}
+
+/**
+ * Record a win for a player
+ * @param {number} winnerIndex - 0 for host, 1 for guest
+ */
+export function recordWin(winnerIndex) {
+    if (winnerIndex === 0) {
+        sessionWins.host++;
+    } else if (winnerIndex === 1) {
+        sessionWins.guest++;
+    }
 }
 
 // Callback setters
@@ -350,7 +365,7 @@ function startAckTimeout() {
 
             // Resend last state (same version)
             const currentState = state.getState();
-            const message = protocol.createStateSync(currentState, stateVersion, rematchRequested);
+            const message = protocol.createStateSync(currentState, stateVersion, rematchRequested, sessionWins);
             sendToGuest(message);
             startAckTimeout();
         } else if (pendingAck) {
@@ -394,3 +409,4 @@ export function isInitialized() { return initialized; }
 export function isGuestConnected() { return guestConnected; }
 export function getRematchStatus() { return { ...rematchRequested }; }
 export function getStateVersion() { return stateVersion; }
+export function getSessionWins() { return { ...sessionWins }; }

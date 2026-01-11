@@ -61,9 +61,10 @@ export function isNewerVersion(received, last) {
  * @param {Object} gameState - Full game state from gameState.js
  * @param {number} version - State version number
  * @param {Object} rematchRequested - Rematch request status { host, guest }
+ * @param {Object} sessionWins - Win counts { host, guest }
  * @returns {Object} STATE_SYNC message
  */
-export function createStateSync(gameState, version, rematchRequested = { host: false, guest: false }) {
+export function createStateSync(gameState, version, rematchRequested = { host: false, guest: false }, sessionWins = { host: 0, guest: 0 }) {
     return {
         type: HostMessage.STATE_SYNC,
         version,
@@ -75,7 +76,8 @@ export function createStateSync(gameState, version, rematchRequested = { host: f
             gamePhase: gameState.gamePhase,
             challenger: gameState.challenger,
             challengeResult: gameState.challengeResult,
-            rematchRequested: rematchRequested
+            rematchRequested: rematchRequested,
+            sessionWins: sessionWins
         }
     };
 }

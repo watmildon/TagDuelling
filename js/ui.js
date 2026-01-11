@@ -793,3 +793,41 @@ export function updateGuestRegionDisplay(region) {
         }
     }
 }
+
+/**
+ * Update session score display for multiplayer
+ * @param {Object} wins - { host: number, guest: number }
+ * @param {Array} players - Player array with names
+ * @param {boolean} show - Whether to show the score display
+ */
+export function updateSessionScore(wins, players, show = true) {
+    const gameScore = document.getElementById('session-score');
+    const gameScoreText = document.getElementById('session-score-text');
+    const resultsScore = document.getElementById('results-session-score');
+    const resultsScoreText = document.getElementById('results-session-score-text');
+
+    const hostName = players[0]?.name || 'Host';
+    const guestName = players[1]?.name || 'Guest';
+    const scoreHtml = `${hostName} <span class="score-value">${wins.host}</span> <span class="score-separator">-</span> <span class="score-value">${wins.guest}</span> ${guestName}`;
+
+    if (gameScore && gameScoreText) {
+        gameScoreText.innerHTML = scoreHtml;
+        gameScore.classList.toggle('hidden', !show);
+    }
+
+    if (resultsScore && resultsScoreText) {
+        resultsScoreText.innerHTML = scoreHtml;
+        resultsScore.classList.toggle('hidden', !show);
+    }
+}
+
+/**
+ * Hide session score displays
+ */
+export function hideSessionScore() {
+    const gameScore = document.getElementById('session-score');
+    const resultsScore = document.getElementById('results-session-score');
+
+    if (gameScore) gameScore.classList.add('hidden');
+    if (resultsScore) resultsScore.classList.add('hidden');
+}

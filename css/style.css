@@ -708,6 +708,32 @@ body[data-theme="dark"] .theme-icon::before {
     text-align: center;
 }
 
+/* Session Score (multiplayer) */
+.session-score {
+    text-align: center;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.session-score .score-label {
+    color: var(--text-secondary);
+    margin-right: 0.5rem;
+}
+
+.session-score .score-value {
+    font-weight: 600;
+}
+
+.session-score .score-separator {
+    margin: 0 0.25rem;
+    color: var(--text-secondary);
+}
+
 /* Results Screen */
 .results-card {
     text-align: center;

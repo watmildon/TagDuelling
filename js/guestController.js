@@ -16,6 +16,7 @@ let pendingAction = null;
 let heartbeatTimeout = null;
 let welcomeReceived = false;
 let lastRematchStatus = { host: false, guest: false };
+let lastSessionWins = { host: 0, guest: 0 };
 
 // Callbacks
 let onStateReceived = null;
@@ -148,6 +149,7 @@ export function shutdown() {
     lastReceivedVersion = 0;
     pendingAction = null;
     lastRematchStatus = { host: false, guest: false };
+    lastSessionWins = { host: 0, guest: 0 };
     console.log('GuestController: Shutdown');
 }
 
@@ -195,6 +197,11 @@ function handleStateSync(message) {
     // Extract rematch status from received state
     if (receivedState.rematchRequested) {
         lastRematchStatus = { ...receivedState.rematchRequested };
+    }
+
+    // Extract session wins from received state
+    if (receivedState.sessionWins) {
+        lastSessionWins = { ...receivedState.sessionWins };
     }
 
     // Apply state to local gameState
@@ -287,3 +294,4 @@ export function hasPendingAction() { return pendingAction !== null; }
 export function getPendingAction() { return pendingAction; }
 export function getLastReceivedVersion() { return lastReceivedVersion; }
 export function getRematchStatus() { return { ...lastRematchStatus }; }
+export function getSessionWins() { return { ...lastSessionWins }; }

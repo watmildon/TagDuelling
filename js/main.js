@@ -706,10 +706,18 @@ function renderGameScreen(currentState) {
     const elements = ui.getElements();
     elements.backToSetupBtn.textContent = isMultiplayerMode() ? 'Abandon Game' : 'Back to Setup';
 
-    // In multiplayer, disable controls when it's not the local player's turn
+    // In multiplayer, disable controls when it's not the local player's turn and show session score
     if (isMultiplayerMode()) {
         const isLocalTurn = isLocalPlayerTurn();
         ui.setGameControlsEnabled(isLocalTurn);
+
+        // Display session score
+        const sessionWins = isHostRole
+            ? hostController.getSessionWins()
+            : guestController.getSessionWins();
+        ui.updateSessionScore(sessionWins, currentState.players, true);
+    } else {
+        ui.hideSessionScore();
     }
 }
 
@@ -720,14 +728,21 @@ function renderResultsScreen(currentState) {
     const ultraLink = overpass.buildUltraLink(currentState.tags, currentState.region);
     ui.renderResults(currentState.challengeResult, currentState.tags, ultraLink);
 
-    // Update rematch UI for multiplayer
+    // Update rematch UI and session score for multiplayer
     if (isMultiplayerMode()) {
         const rematchStatus = isHostRole
             ? hostController.getRematchStatus()
             : guestController.getRematchStatus();
         ui.updateRematchUI(isHostRole, rematchStatus);
+
+        // Display session score
+        const sessionWins = isHostRole
+            ? hostController.getSessionWins()
+            : guestController.getSessionWins();
+        ui.updateSessionScore(sessionWins, currentState.players, true);
     } else {
         ui.resetRematchUI();
+        ui.hideSessionScore();
     }
 }
 
@@ -967,10 +982,22 @@ async function executeChallengeQuery(tags, region) {
             return;
         }
 
-        // Set result
+        // Record win for multiplayer session tracking BEFORE setting result
+        // (setChallengeResult triggers UI render, so wins must be recorded first)
+        if (isMultiplayerMode() && isHostRole) {
+            // Determine winner based on count (same logic as setChallengeResult)
+            const currentState = state.getState();
+            const challengerIndex = currentState.currentPlayerIndex;
+            const previousPlayerIndex = (challengerIndex - 1 + 2) % 2;
+            // count === 0 means challenger wins, otherwise previous player wins
+            const winnerIndex = count === 0 ? challengerIndex : previousPlayerIndex;
+            hostController.recordWin(winnerIndex);
+        }
+
+        // Set result (this triggers UI render via state subscribers)
         state.setChallengeResult(count);
 
-        // Broadcast result to guest if host
+        // Broadcast updated state to guest
         if (isMultiplayerMode() && isHostRole) {
             hostController.broadcastState();
         }
