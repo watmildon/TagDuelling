@@ -1,3 +1,6 @@
+<img width="50%" height="50%" alt="image" src="https://github.com/user-attachments/assets/f2491c9f-c279-4811-baa8-286649a9ef49" />
+
+
 # Tag Duelling
 
 A multiplayer game where players competitively suggest [OpenStreetMap tags](https://wiki.openstreetmap.org/wiki/Tags) into a plausible tag pool for an object. Players take turns adding tags or specifying values, and opponents can challenge the validity of the tag combination. If there's nothing in the database with that set of tags, the challenging player wins.
