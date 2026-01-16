@@ -585,6 +585,7 @@ body[data-theme="dark"] .theme-icon::before {
     padding: 0.5rem 0.75rem;
     background-color: var(--bg-tertiary);
     border-radius: var(--radius-sm);
+    position: relative;
 }
 
 .tag-key {
@@ -1536,4 +1537,48 @@ body[data-theme="dark"] .highscore-display {
     padding: 0.5rem;
     background: var(--tag-value-bg);
     border-radius: var(--radius-md);
+}
+
+/* Autocomplete Dropdown */
+.autocomplete-dropdown {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.autocomplete-item {
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background-color: var(--bg-tertiary);
+}
+
+.autocomplete-item.selected {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.autocomplete-no-suggestions {
+    color: var(--text-muted);
+    font-style: italic;
+    cursor: default;
+}
+
+.autocomplete-no-suggestions:hover {
+    background-color: transparent;
 }

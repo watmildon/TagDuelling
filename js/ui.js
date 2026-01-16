@@ -4,6 +4,7 @@
  */
 
 import { PHASES } from './gameState.js';
+import * as autocomplete from './autocomplete.js';
 
 // DOM element references (cached for performance)
 let elements = null;
@@ -234,6 +235,9 @@ export function renderCurrentPlayer(currentPlayer, players, currentIndex, tags =
  * @param {Array} tags - Array of {key, value} objects
  */
 export function renderTagPool(tags) {
+    // Clean up any existing autocomplete dropdowns before re-rendering
+    autocomplete.cleanup();
+
     elements.tagPool.innerHTML = '';
 
     // Render existing tags
@@ -270,7 +274,11 @@ export function renderTagPool(tags) {
             valueInput.placeholder = 'Add a value...';
             valueInput.dataset.tagIndex = index;
             valueInput.dataset.inputType = 'value';
+            valueInput.autocomplete = 'off';
             tagItem.appendChild(valueInput);
+
+            // Attach autocomplete for value suggestions
+            autocomplete.attachToInput(valueInput, 'value', tag.key);
         }
 
         elements.tagPool.appendChild(tagItem);
@@ -286,9 +294,13 @@ export function renderTagPool(tags) {
     newTagInput.id = 'new-tag-input';
     newTagInput.placeholder = tags.length === 0 ? 'Enter tag (e.g., amenity or amenity=cafe)' : 'Add new tag...';
     newTagInput.dataset.inputType = 'new';
+    newTagInput.autocomplete = 'off';
 
     newTagItem.appendChild(newTagInput);
     elements.tagPool.appendChild(newTagItem);
+
+    // Attach autocomplete for key suggestions (and key=value)
+    autocomplete.attachToInput(newTagInput, 'new');
 
     // Focus the new tag input
     newTagInput.focus();

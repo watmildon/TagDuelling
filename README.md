@@ -13,6 +13,7 @@ Special shout outs to the folks running the https://private.coffee/ Overpass int
 - Bot opponents can be added, or watch the bots duel it out
 - Regional filtering (countries, states, cities, or custom OSM relation IDs)
 - Light/dark theme support
+- Tag suggestions as you type (top 2000 keys from [TagInfo](https://taginfo.openstreetmap.org/) with prevalent values)
 
 ### Challenge Resolution
 
