@@ -119,9 +119,14 @@ function handleFocus(e) {
  * Handle blur event - hide suggestions after a delay
  */
 function handleBlur(e) {
+    const blurredInput = e.target;
     // Delay to allow click events on dropdown items
     setTimeout(() => {
-        hideDropdown();
+        // Only hide if the blurred input is still the active one
+        // (prevents hiding when focus moves to another autocomplete input)
+        if (activeInput === blurredInput || activeInput === null) {
+            hideDropdown();
+        }
     }, 150);
 }
 
@@ -225,12 +230,10 @@ function showSuggestionsForInput(input) {
             input.dataset.autocompleteContext = 'value';
             input.dataset.autocompleteKeyPart = key;
         } else {
-            // User is typing a key
-            if (value) {
-                suggestions = getKeySuggestions(value, 10);
-                if (suggestions.length === 0) {
-                    showNoSuggestions = true;
-                }
+            // User is typing a key (or input is empty - show top keys)
+            suggestions = getKeySuggestions(value, 10);
+            if (suggestions.length === 0 && value) {
+                showNoSuggestions = true;
             }
             input.dataset.autocompleteContext = 'key';
         }
@@ -239,14 +242,16 @@ function showSuggestionsForInput(input) {
         const key = input.dataset.autocompleteKey;
         if (key) {
             if (trie.hasKey(key)) {
+                // Show top values when empty, or filtered values when typing
                 suggestions = getValueSuggestions(key, value, 10);
                 if (suggestions.length === 0 && value) {
                     showNoSuggestions = true;
                 }
-            } else {
-                // Key not in trie - show "no suggestions"
+            } else if (value) {
+                // Key not in trie and user is typing - show "no suggestions"
                 showNoSuggestions = true;
             }
+            // If key not in trie and input is empty, just don't show anything
         }
     }
 
