@@ -10,6 +10,7 @@ import * as bot from './bot.js';
 import * as webrtc from './webrtc.js';
 import * as hostController from './hostController.js';
 import * as guestController from './guestController.js';
+import * as autocomplete from './autocomplete.js';
 
 // DEPRECATED: multiplayer.js is being phased out
 // import * as multiplayer from './multiplayer.js';
@@ -71,7 +72,7 @@ function getLocalPlayerIndex() {
 /**
  * Initialize the application
  */
-function init() {
+async function init() {
     // Initialize UI elements
     const elements = ui.initElements();
 
@@ -94,6 +95,9 @@ function init() {
 
     // Set up WebRTC message routing to appropriate controller
     webrtc.onMessage(handleWebRTCMessage);
+
+    // Initialize autocomplete (load tag data in background)
+    autocomplete.init();
 
     // Initial render
     renderFromState();
