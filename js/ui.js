@@ -274,6 +274,7 @@ export function renderTagPool(tags) {
             valueInput.placeholder = 'Add a value...';
             valueInput.dataset.tagIndex = index;
             valueInput.dataset.inputType = 'value';
+            valueInput.autocomplete = 'off';
             tagItem.appendChild(valueInput);
 
             // Attach autocomplete for value suggestions
@@ -293,6 +294,7 @@ export function renderTagPool(tags) {
     newTagInput.id = 'new-tag-input';
     newTagInput.placeholder = tags.length === 0 ? 'Enter tag (e.g., amenity or amenity=cafe)' : 'Add new tag...';
     newTagInput.dataset.inputType = 'new';
+    newTagInput.autocomplete = 'off';
 
     newTagItem.appendChild(newTagInput);
     elements.tagPool.appendChild(newTagItem);
